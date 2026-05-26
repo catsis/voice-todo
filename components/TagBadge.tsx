@@ -1,31 +1,33 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { TaskCategory, Priority } from '../types/task';
+import { C, F } from '../lib/theme';
 
+// Carbon g100 categorical color palette
 const KNOWN_COLORS: Record<string, { bg: string; text: string }> = {
-  請購: { bg: '#2A1500', text: '#F97316' },
-  聯絡: { bg: '#0F1830', text: '#60A5FA' },
-  聯繫: { bg: '#0F1830', text: '#60A5FA' },
-  繳費: { bg: '#2A0A0A', text: '#F87171' },
-  預約: { bg: '#0A2015', text: '#34D399' },
-  開會: { bg: '#1A0A2A', text: '#C084FC' },
-  會議: { bg: '#1A0A2A', text: '#C084FC' },
-  提醒: { bg: '#2A1E00', text: '#FCD34D' },
-  記得: { bg: '#2A1E00', text: '#FCD34D' },
-  確認: { bg: '#0A1F2A', text: '#38BDF8' },
-  其他: { bg: '#1E1E26', text: '#6B6B7A' },
-  待辦: { bg: '#1E1E26', text: '#6B6B7A' },
+  請購: { bg: '#2D1000', text: '#FF832B' },
+  聯絡: { bg: '#001D6C', text: '#4589FF' },
+  聯繫: { bg: '#001D6C', text: '#4589FF' },
+  繳費: { bg: '#2D0709', text: '#FF8389' },
+  預約: { bg: '#022D0D', text: '#42BE65' },
+  開會: { bg: '#1C0F30', text: '#D4BBFF' },
+  會議: { bg: '#1C0F30', text: '#D4BBFF' },
+  提醒: { bg: '#302400', text: '#F1C21B' },
+  記得: { bg: '#302400', text: '#F1C21B' },
+  確認: { bg: '#001D1D', text: '#3DDBD9' },
+  其他: { bg: C.layer01, text: C.textSecondary },
+  待辦: { bg: C.layer01, text: C.textSecondary },
 };
 
 const PALETTE = [
-  { bg: '#0A2015', text: '#34D399' },
-  { bg: '#0F1830', text: '#60A5FA' },
-  { bg: '#1A0A2A', text: '#C084FC' },
-  { bg: '#2A1500', text: '#F97316' },
-  { bg: '#0A2020', text: '#2DD4BF' },
-  { bg: '#2A0A18', text: '#F472B6' },
-  { bg: '#1A200A', text: '#A3E635' },
-  { bg: '#100A2A', text: '#818CF8' },
+  { bg: '#022D0D', text: '#42BE65' },
+  { bg: '#001D6C', text: '#4589FF' },
+  { bg: '#1C0F30', text: '#D4BBFF' },
+  { bg: '#2D1000', text: '#FF832B' },
+  { bg: '#001D1D', text: '#3DDBD9' },
+  { bg: '#57012A', text: '#FF7EB6' },
+  { bg: '#293E00', text: '#A8C353' },
+  { bg: '#100839', text: '#BE95FF' },
 ];
 
 function getCategoryColor(category: string): { bg: string; text: string } {
@@ -70,32 +72,34 @@ const styles = StyleSheet.create({
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: 4,
     alignSelf: 'flex-start',
   },
   small: {
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 2,
   },
   text: {
     fontSize: 13,
     fontWeight: '600',
+    fontFamily: F.semiBold,
   },
   smallText: {
     fontSize: 11,
   },
   urgentBadge: {
-    backgroundColor: 'rgba(245, 101, 101, 0.18)',
+    backgroundColor: C.supportErrorBg,
     paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(245, 101, 101, 0.3)',
+    borderColor: C.supportErrorBorder,
   },
   urgentText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#F56565',
+    fontWeight: '600',
+    fontFamily: F.semiBold,
+    color: C.supportError,
   },
 });

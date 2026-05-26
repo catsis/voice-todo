@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Task } from '../types/task';
 import { loadTasks, addTask, toggleTask, deleteTask, updateTask } from '../lib/storage';
+import { C, S, F, TS } from '../lib/theme';
 import TaskCard from '../components/TaskCard';
 import VoiceModal, { MicIcon } from '../components/VoiceModal';
 import TaskDetailModal from '../components/TaskDetailModal';
@@ -160,20 +161,20 @@ export default function HomeScreen({ apiKey, onOpenSettings }: Props) {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="#6B85F0"
-              colors={['#6B85F0']}
+              tintColor={C.interactive}
+              colors={[C.interactive]}
             />
           }
         />
 
-        {/* FAB — 底部置中 */}
+        {/* FAB */}
         <View style={styles.fabWrapper} pointerEvents="box-none">
           <TouchableOpacity
             style={styles.fab}
             onPress={() => setModalVisible(true)}
             activeOpacity={0.85}
           >
-            <MicIcon size={26} color="#FFFFFF" />
+            <MicIcon size={26} color={C.textOnColor} />
           </TouchableOpacity>
         </View>
 
@@ -213,98 +214,90 @@ function EmptyState({ filter }: { filter: FilterType }) {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#0E0E11',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#0E0E11',
-  },
+  safe: { flex: 1, backgroundColor: C.background },
+  container: { flex: 1, backgroundColor: C.background },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 20,
+    paddingHorizontal: S.s06,
+    paddingTop: S.s04,
+    paddingBottom: S.s06,
   },
   headerDate: {
-    fontSize: 12,
-    color: '#7878A0',
-    fontWeight: '500',
+    fontSize: TS.label01,
+    color: C.textSecondary,
+    fontFamily: F.regular,
     letterSpacing: 1,
-    marginBottom: 4,
+    marginBottom: S.s02,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: S.s03,
   },
   appTitle: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: '#EAEAF0',
+    fontSize: TS.heading05,
+    fontFamily: F.bold,
+    color: C.textPrimary,
     letterSpacing: -1,
   },
   badge: {
-    backgroundColor: '#6B85F0',
+    backgroundColor: C.interactive,
     borderRadius: 12,
     minWidth: 26,
     height: 26,
-    paddingHorizontal: 8,
+    paddingHorizontal: S.s03,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 2,
+    marginBottom: S.s01,
   },
   badgeText: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontFamily: F.bold,
+    color: C.textOnColor,
   },
   settingsBtn: {
-    padding: 6,
-    marginBottom: 4,
+    padding: S.s03,
+    marginBottom: S.s02,
   },
   settingsIcon: {
     fontSize: 20,
-    color: '#7878A0',
+    color: C.textSecondary,
   },
-  filterBar: {
-    flexGrow: 0,
-  },
+  filterBar: { flexGrow: 0 },
   filterBarContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    gap: 8,
+    paddingHorizontal: S.s06,
+    paddingBottom: S.s05,
+    gap: S.s03,
   },
   filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
+    paddingHorizontal: S.s04,
+    paddingVertical: S.s02,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#40406A',
+    borderColor: C.borderSubtle01,
   },
   filterChipActive: {
-    backgroundColor: '#6B85F0',
-    borderColor: '#6B85F0',
+    backgroundColor: C.interactive,
+    borderColor: C.interactive,
   },
   filterText: {
     fontSize: 13,
-    color: '#7878A0',
-    fontWeight: '500',
+    color: C.textSecondary,
+    fontFamily: F.regular,
   },
   filterTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
+    color: C.textOnColor,
+    fontFamily: F.semiBold,
   },
   listContent: {
-    paddingTop: 4,
+    paddingTop: S.s02,
     paddingBottom: 130,
   },
   fabWrapper: {
     position: 'absolute',
-    bottom: 32,
+    bottom: S.s07,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -313,10 +306,10 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#6B85F0',
+    backgroundColor: C.buttonPrimary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#6B85F0',
+    shadowColor: C.buttonPrimary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.7,
     shadowRadius: 20,
@@ -325,15 +318,15 @@ const styles = StyleSheet.create({
   emptyContainer: {
     paddingTop: 100,
     alignItems: 'center',
-    gap: 14,
+    gap: S.s04,
   },
   emptyIcon: {
     fontSize: 44,
-    color: '#404060',
+    color: C.layer02,
   },
   emptyTitle: {
-    fontSize: 15,
-    color: '#606080',
-    fontWeight: '500',
+    fontSize: TS.body02,
+    color: C.borderSubtle01,
+    fontFamily: F.regular,
   },
 });

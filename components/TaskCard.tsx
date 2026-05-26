@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { Task } from '../types/task';
 import { CategoryBadge, PriorityBadge } from './TagBadge';
+import { C, S, F } from '../lib/theme';
 
 interface Props {
   task: Task;
@@ -42,13 +43,11 @@ export default function TaskCard({ task, onToggle, onDelete, onPress }: Props) {
         activeOpacity={0.7}
         style={styles.cardBody}
       >
-        {/* Badges */}
         <View style={styles.badges}>
           <CategoryBadge category={task.category} />
           <PriorityBadge priority={task.priority} />
         </View>
 
-        {/* Target */}
         <Text
           style={[styles.targetText, task.completed && styles.targetDone]}
           numberOfLines={2}
@@ -56,13 +55,11 @@ export default function TaskCard({ task, onToggle, onDelete, onPress }: Props) {
           {task.target}
         </Text>
 
-        {/* Time */}
         {task.time ? (
           <Text style={styles.timeText}>◷  {task.time}</Text>
         ) : null}
       </TouchableOpacity>
 
-      {/* Actions */}
       <View style={styles.actions}>
         {task.completed ? (
           <TouchableOpacity
@@ -95,83 +92,86 @@ export default function TaskCard({ task, onToggle, onDelete, onPress }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#17171C',
-    borderRadius: 14,
-    marginHorizontal: 16,
-    marginVertical: 5,
+    backgroundColor: C.layer01,
+    borderRadius: 4,
+    marginHorizontal: S.s05,
+    marginVertical: S.s02,
     flexDirection: 'row',
     alignItems: 'center',
     overflow: 'hidden',
   },
   cardUrgent: {
     borderLeftWidth: 3,
-    borderLeftColor: '#F56565',
+    borderLeftColor: C.supportError,
   },
   cardBody: {
     flex: 1,
-    padding: 16,
-    gap: 7,
+    padding: S.s05,
+    gap: S.s03,
   },
   badges: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: S.s03,
   },
   actions: {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 14,
-    paddingRight: 16,
-    paddingLeft: 4,
+    gap: S.s04,
+    paddingRight: S.s05,
+    paddingLeft: S.s02,
   },
   checkBtn: {
     width: 28,
     height: 28,
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: '#50507A',
+    borderColor: C.borderSubtle01,
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkIcon: {
     fontSize: 13,
-    color: '#50507A',
+    color: C.borderSubtle01,
   },
   doneBtn: {
-    backgroundColor: 'rgba(61, 204, 136, 0.1)',
-    borderRadius: 8,
+    backgroundColor: C.supportSuccessBg,
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#3DCC88',
+    borderColor: C.supportSuccess,
     paddingHorizontal: 6,
-    paddingVertical: 4,
+    paddingVertical: S.s02,
   },
   doneBtnText: {
     fontSize: 11,
-    color: '#3DCC88',
-    fontWeight: '700',
+    color: C.supportSuccess,
+    fontWeight: '600',
+    fontFamily: F.semiBold,
   },
   deleteBtn: {
-    padding: 2,
+    padding: S.s01,
   },
   deleteIcon: {
     fontSize: 13,
-    color: '#555578',
+    color: C.iconDisabled,
   },
   targetText: {
     fontSize: 16,
-    color: '#EAEAF0',
+    color: C.textPrimary,
     fontWeight: '600',
+    fontFamily: F.semiBold,
     lineHeight: 22,
   },
   targetDone: {
     textDecorationLine: 'line-through',
-    color: '#35354A',
+    color: C.textDisabled,
   },
   timeText: {
     fontSize: 12,
-    color: '#7878A0',
-    marginTop: 2,
+    color: C.textSecondary,
+    fontFamily: F.regular,
+    marginTop: S.s01,
   },
 });

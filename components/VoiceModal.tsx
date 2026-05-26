@@ -21,6 +21,7 @@ import {
 } from 'expo-speech-recognition';
 import { ExtractedData, TaskCategory, Task } from '../types/task';
 import { extractTaskFromVoice } from '../lib/claude';
+import { C, S, F, TS } from '../lib/theme';
 
 type Stage = 'idle' | 'recording' | 'transcribed' | 'processing' | 'result';
 
@@ -101,18 +102,18 @@ const col = StyleSheet.create({
   wrap: { flex: 1, alignItems: 'center' },
   scrollWrap: { height: ITEM_H * 5, overflow: 'hidden', width: '100%' },
   item: { height: ITEM_H, justifyContent: 'center', alignItems: 'center' },
-  text: { fontSize: 20, color: '#40405A', fontWeight: '400' },
-  textSel: { fontSize: 22, color: '#EAEAF0', fontWeight: '700' },
+  text: { fontSize: 20, color: C.textDisabled, fontFamily: F.regular },
+  textSel: { fontSize: 22, color: C.textPrimary, fontFamily: F.semiBold },
   highlight: {
     height: ITEM_H, marginHorizontal: 6,
-    backgroundColor: 'rgba(107,133,240,0.12)',
-    borderRadius: 10, borderWidth: 1,
-    borderColor: 'rgba(107,133,240,0.22)',
+    backgroundColor: C.interactiveHighlight,
+    borderRadius: 4, borderWidth: 1,
+    borderColor: C.interactiveBorder,
   },
-  label: { fontSize: 12, color: '#7878A0', marginTop: 8, fontWeight: '500' },
+  label: { fontSize: TS.label01, color: C.textSecondary, marginTop: S.s03, fontFamily: F.regular },
 });
 
-// ── 自製麥克風圖示 ───────────────────────────────────────────────
+// ── 自製麥克風圖示 ────────────────────────────────────────────
 export function MicIcon({ size = 28, color = '#FFFFFF' }: { size?: number; color?: string }) {
   const bw = Math.max(2, Math.round(size * 0.065));
   const bW = Math.round(size * 0.36);
@@ -136,10 +137,10 @@ export function MicIcon({ size = 28, color = '#FFFFFF' }: { size?: number; color
 
 function StopIcon({ size = 20, color = '#FFFFFF' }: { size?: number; color?: string }) {
   const s = Math.round(size * 0.52);
-  return <View style={{ width: s, height: s, borderRadius: 4, backgroundColor: color }} />;
+  return <View style={{ width: s, height: s, borderRadius: 2, backgroundColor: color }} />;
 }
 
-// ── 主元件 ──────────────────────────────────────────────────────
+// ── 主元件 ────────────────────────────────────────────────────
 export default function VoiceModal({ visible, apiKey, onClose, onAdd }: Props) {
   const [stage, setStage] = useState<Stage>('idle');
   const [transcript, setTranscript] = useState('');
@@ -276,11 +277,7 @@ export default function VoiceModal({ visible, apiKey, onClose, onAdd }: Props) {
 
   const canAdd = stage === 'result' && editTarget.trim().length > 0;
   const isVoiceStage = stage === 'idle' || stage === 'recording' || stage === 'transcribed';
-
-  const headerTitle =
-    stage === 'result' ? '確認內容'
-    : stage === 'processing' ? 'AI 分析中'
-    : '語音輸入';
+  const headerTitle = stage === 'result' ? '確認內容' : stage === 'processing' ? 'AI 分析中' : '語音輸入';
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -296,7 +293,7 @@ export default function VoiceModal({ visible, apiKey, onClose, onAdd }: Props) {
             <View style={{ width: 44 }} />
           </View>
 
-          {/* Date picker 覆蓋 */}
+          {/* 日期選擇器覆蓋 */}
           {showDatePicker && (
             <View style={s.dateOverlay}>
               <View style={s.dateHeader}>
@@ -319,7 +316,6 @@ export default function VoiceModal({ visible, apiKey, onClose, onAdd }: Props) {
           {/* ── 語音輸入階段 ── */}
           {isVoiceStage && !showDatePicker && (
             <View style={s.voiceWrap}>
-              {/* 中央：轉錄文字 */}
               <View style={s.voiceCenter}>
                 {transcript || stage === 'transcribed' ? (
                   <TextInput
@@ -331,22 +327,19 @@ export default function VoiceModal({ visible, apiKey, onClose, onAdd }: Props) {
                     textAlign="center"
                     textAlignVertical="center"
                     placeholder="說出你要做的事…"
-                    placeholderTextColor="#40405A"
+                    placeholderTextColor={C.textDisabled}
                   />
                 ) : (
                   <Text style={s.hintText}>說出你要做的事…</Text>
                 )}
               </View>
 
-              {/* 底部操作區 */}
               <View style={s.micBar}>
                 {stage === 'transcribed' ? (
                   <View style={s.transcribedRow}>
-                    {/* 重新錄音 */}
                     <TouchableOpacity onPress={startRecording} style={s.reRecordBtn}>
-                      <MicIcon size={20} color="#7878A0" />
+                      <MicIcon size={20} color={C.textSecondary} />
                     </TouchableOpacity>
-                    {/* 分析 */}
                     <TouchableOpacity
                       onPress={handleAnalyze}
                       style={[s.analyzeBtn, !transcript.trim() && s.analyzeBtnOff]}
@@ -358,7 +351,6 @@ export default function VoiceModal({ visible, apiKey, onClose, onAdd }: Props) {
                   </View>
                 ) : (
                   <View style={s.micRowWrap}>
-                    {/* 左側佔位符，使麥克風保持視覺置中 */}
                     {stage === 'idle' && <View style={s.micSpacer} />}
 
                     <View style={s.micCenter}>
@@ -378,7 +370,6 @@ export default function VoiceModal({ visible, apiKey, onClose, onAdd }: Props) {
                       </TouchableOpacity>
                     </View>
 
-                    {/* 手動輸入按鈕，僅 idle 顯示 */}
                     {stage === 'idle' && (
                       <TouchableOpacity
                         onPress={handleManualInput}
@@ -397,7 +388,7 @@ export default function VoiceModal({ visible, apiKey, onClose, onAdd }: Props) {
           {/* ── 分析中 ── */}
           {stage === 'processing' && !showDatePicker && (
             <View style={s.processingArea}>
-              <ActivityIndicator size="large" color="#6B85F0" />
+              <ActivityIndicator size="large" color={C.interactive} />
               <Text style={s.processingText}>AI 分析中</Text>
               <Text style={s.processingRaw}>「{rawInput}」</Text>
             </View>
@@ -436,7 +427,7 @@ export default function VoiceModal({ visible, apiKey, onClose, onAdd }: Props) {
                   value={editTarget}
                   onChangeText={setEditTarget}
                   placeholder="對象或物品"
-                  placeholderTextColor="#646490"
+                  placeholderTextColor={C.textPlaceholder}
                 />
               </View>
 
@@ -454,7 +445,7 @@ export default function VoiceModal({ visible, apiKey, onClose, onAdd }: Props) {
                   value={editNotes}
                   onChangeText={setEditNotes}
                   placeholder="補充說明（選填）"
-                  placeholderTextColor="#646490"
+                  placeholderTextColor={C.textPlaceholder}
                   multiline
                   textAlignVertical="top"
                 />
@@ -492,154 +483,150 @@ export default function VoiceModal({ visible, apiKey, onClose, onAdd }: Props) {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0E0E11' },
-  container: { flex: 1, backgroundColor: '#0E0E11' },
+  safe: { flex: 1, backgroundColor: C.background },
+  container: { flex: 1, backgroundColor: C.background },
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 16, paddingHorizontal: 20,
-    borderBottomWidth: 1, borderBottomColor: '#282840',
+    paddingVertical: S.s05, paddingHorizontal: S.s06,
+    borderBottomWidth: 1, borderBottomColor: C.layer02,
   },
   closeBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
-  closeBtnText: { fontSize: 18, color: '#7878A0' },
-  title: { fontSize: 16, fontWeight: '700', color: '#EAEAF0' },
+  closeBtnText: { fontSize: 18, color: C.textSecondary },
+  title: { fontSize: TS.body02, fontFamily: F.semiBold, color: C.textPrimary },
 
   // Date picker
-  dateOverlay: { flex: 1, backgroundColor: '#0E0E11' },
+  dateOverlay: { flex: 1, backgroundColor: C.background },
   dateHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#282840',
+    paddingHorizontal: S.s06, paddingVertical: S.s04,
+    borderBottomWidth: 1, borderBottomColor: C.layer02,
   },
-  dateBtn: { paddingHorizontal: 4, paddingVertical: 4 },
-  dateTitle: { fontSize: 16, fontWeight: '700', color: '#EAEAF0' },
-  dateCancel: { fontSize: 15, color: '#7878A0' },
-  dateConfirm: { fontSize: 15, color: '#6B85F0', fontWeight: '700' },
-  dateCols: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 24 },
+  dateBtn: { paddingHorizontal: S.s02, paddingVertical: S.s02 },
+  dateTitle: { fontSize: TS.body02, fontFamily: F.semiBold, color: C.textPrimary },
+  dateCancel: { fontSize: TS.body02, color: C.textSecondary, fontFamily: F.regular },
+  dateConfirm: { fontSize: TS.body02, color: C.interactive, fontFamily: F.semiBold },
+  dateCols: { flexDirection: 'row', paddingHorizontal: S.s05, paddingTop: S.s06 },
 
   // Voice stage
   voiceWrap: { flex: 1, flexDirection: 'column' },
-  voiceCenter: {
-    flex: 1, justifyContent: 'center', alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  hintText: { fontSize: 18, color: '#35355A', textAlign: 'center' },
+  voiceCenter: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: S.s07 },
+  hintText: { fontSize: 18, color: C.textDisabled, textAlign: 'center', fontFamily: F.regular },
   transcriptInput: {
-    fontSize: 22, color: '#EAEAF0', textAlign: 'center',
-    width: '100%', padding: 16, lineHeight: 32,
+    fontSize: 22, color: C.textPrimary, textAlign: 'center', fontFamily: F.regular,
+    width: '100%', padding: S.s05, lineHeight: 32,
   },
 
   // Mic bar
   micBar: {
-    paddingHorizontal: 28,
+    paddingHorizontal: S.s07,
     paddingBottom: Platform.OS === 'ios' ? 44 : 36,
-    paddingTop: 16,
+    paddingTop: S.s05,
   },
-  micRowWrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24 },
+  micRowWrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: S.s06 },
   micSpacer: { width: 44 },
   micCenter: { alignItems: 'center' },
-  manualBtn: {
-    width: 44, height: 44, borderRadius: 22,
-    borderWidth: 1.5, borderColor: '#40406A',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  manualBtnText: { fontSize: 20, color: '#7878A0' },
   micPulse: {
     position: 'absolute',
     width: 96, height: 96, borderRadius: 48,
-    backgroundColor: 'rgba(107,133,240,0.1)',
+    backgroundColor: 'rgba(15,98,254,0.1)',
   },
-  micPulseRec: { backgroundColor: 'rgba(245,101,101,0.1)' },
+  micPulseRec: { backgroundColor: 'rgba(218,30,40,0.1)' },
   micFab: {
     width: 72, height: 72, borderRadius: 36,
-    backgroundColor: '#6B85F0',
+    backgroundColor: C.buttonPrimary,
     justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#6B85F0', shadowOffset: { width: 0, height: 0 },
+    shadowColor: C.buttonPrimary, shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.7, shadowRadius: 22, elevation: 14,
   },
-  micFabRec: { backgroundColor: '#F56565', shadowColor: '#F56565' },
+  micFabRec: { backgroundColor: C.supportError, shadowColor: C.supportError },
+  manualBtn: {
+    width: 44, height: 44, borderRadius: 22,
+    borderWidth: 1.5, borderColor: C.borderSubtle01,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  manualBtnText: { fontSize: 20, color: C.textSecondary },
 
-  // Transcribed actions
-  transcribedRow: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+  // Transcribed
+  transcribedRow: { flexDirection: 'row', gap: S.s04, alignItems: 'center' },
   reRecordBtn: {
     width: 56, height: 56, borderRadius: 28,
-    borderWidth: 1.5, borderColor: '#40406A',
+    borderWidth: 1.5, borderColor: C.borderSubtle01,
     justifyContent: 'center', alignItems: 'center',
   },
   analyzeBtn: {
-    flex: 1, backgroundColor: '#6B85F0', borderRadius: 14,
+    flex: 1, backgroundColor: C.buttonPrimary, borderRadius: 4,
     paddingVertical: 17, alignItems: 'center',
-    shadowColor: '#6B85F0', shadowOffset: { width: 0, height: 0 },
+    shadowColor: C.buttonPrimary, shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
   },
-  analyzeBtnOff: { backgroundColor: '#1C1C28', shadowOpacity: 0, elevation: 0 },
-  analyzeBtnText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
+  analyzeBtnOff: { backgroundColor: C.layer01, shadowOpacity: 0, elevation: 0 },
+  analyzeBtnText: { color: C.textOnColor, fontSize: 17, fontFamily: F.semiBold },
 
   // Processing
-  processingArea: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
-  processingText: { fontSize: 16, color: '#6B85F0', fontWeight: '600' },
-  processingRaw: { fontSize: 14, color: '#646490', fontStyle: 'italic' },
+  processingArea: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: S.s05 },
+  processingText: { fontSize: TS.body02, color: C.interactive, fontFamily: F.semiBold },
+  processingRaw: { fontSize: TS.body01, color: C.textHelper, fontFamily: F.regular, fontStyle: 'italic' },
 
   // Result
-  resultBody: { padding: 20, gap: 10, paddingBottom: 16 },
+  resultBody: { padding: S.s06, gap: S.s03, paddingBottom: S.s05 },
   autoCard: {
-    backgroundColor: '#17171C', borderRadius: 12, padding: 14,
-    borderLeftWidth: 2, borderLeftColor: '#6B85F0', gap: 8,
+    backgroundColor: C.layer01, borderRadius: 4, padding: S.s04,
+    borderLeftWidth: 2, borderLeftColor: C.interactive, gap: S.s03,
   },
-  autoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  autoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: S.s03 },
   statusBadge: {
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 4, paddingHorizontal: S.s03, paddingVertical: S.s02,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
-  statusBadgeText: { fontSize: 13, color: '#8888A8', fontWeight: '600' },
+  statusBadgeText: { fontSize: 13, color: C.textSecondary, fontFamily: F.semiBold },
   actionBadge: {
-    backgroundColor: 'rgba(107,133,240,0.18)',
-    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4,
+    backgroundColor: C.interactiveBg,
+    borderRadius: 4, paddingHorizontal: S.s03, paddingVertical: S.s02,
   },
-  actionBadgeText: { fontSize: 13, color: '#6B85F0', fontWeight: '700' },
+  actionBadgeText: { fontSize: 13, color: C.interactive, fontFamily: F.semiBold },
   urgentBadge: {
-    backgroundColor: 'rgba(245,101,101,0.18)',
-    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4,
+    backgroundColor: C.supportErrorBg,
+    borderRadius: 4, paddingHorizontal: S.s03, paddingVertical: S.s02,
   },
-  urgentBadgeText: { fontSize: 13, color: '#F56565', fontWeight: '700' },
-  autoRaw: { fontSize: 13, color: '#646490', fontStyle: 'italic' },
+  urgentBadgeText: { fontSize: 13, color: C.supportError, fontFamily: F.semiBold },
+  autoRaw: { fontSize: TS.body01, color: C.textHelper, fontFamily: F.regular, fontStyle: 'italic' },
 
-  fieldCard: { backgroundColor: '#17171C', borderRadius: 12, padding: 14 },
+  fieldCard: { backgroundColor: C.layer01, borderRadius: 4, padding: S.s04 },
   fieldLabel: {
-    fontSize: 11, color: '#646490', fontWeight: '600',
-    marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.8,
+    fontSize: TS.label01, color: C.textHelper, fontFamily: F.semiBold,
+    marginBottom: S.s03, textTransform: 'uppercase', letterSpacing: 0.8,
   },
   fieldInput: {
-    fontSize: 16, color: '#EAEAF0',
-    borderBottomWidth: 1, borderBottomColor: '#40406A', paddingVertical: 4,
+    fontSize: TS.body02, color: C.textPrimary, fontFamily: F.regular,
+    borderBottomWidth: 1, borderBottomColor: C.borderSubtle01, paddingVertical: S.s02,
   },
-  fieldPlaceholder: { color: '#646490' },
+  fieldPlaceholder: { color: C.textPlaceholder },
   notesInput: { minHeight: 56, borderBottomWidth: 0 },
 
   urgentToggle: {
-    backgroundColor: '#17171C', borderRadius: 12, padding: 14,
-    alignItems: 'center', borderWidth: 1, borderColor: '#40406A',
+    backgroundColor: C.layer01, borderRadius: 4, padding: S.s04,
+    alignItems: 'center', borderWidth: 1, borderColor: C.borderSubtle01,
   },
   urgentToggleOn: {
-    backgroundColor: 'rgba(245,101,101,0.08)',
-    borderColor: 'rgba(245,101,101,0.3)',
+    backgroundColor: C.supportErrorBg, borderColor: C.supportErrorBorder,
   },
-  urgentToggleText: { fontSize: 14, color: '#646490', fontWeight: '500' },
-  urgentToggleTextOn: { color: '#F56565', fontWeight: '700' },
+  urgentToggleText: { fontSize: TS.body01, color: C.textHelper, fontFamily: F.regular },
+  urgentToggleTextOn: { color: C.supportError, fontFamily: F.semiBold },
 
   addBtnWrap: {
-    paddingHorizontal: 24,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
-    paddingTop: 12,
-    borderTopWidth: 1, borderTopColor: '#282840',
+    paddingHorizontal: S.s06,
+    paddingBottom: Platform.OS === 'ios' ? 34 : S.s06,
+    paddingTop: S.s04,
+    borderTopWidth: 1, borderTopColor: C.layer02,
   },
   addBtn: {
-    backgroundColor: '#6B85F0', borderRadius: 14,
-    paddingVertical: 16, alignItems: 'center',
-    shadowColor: '#6B85F0', shadowOffset: { width: 0, height: 0 },
+    backgroundColor: C.buttonPrimary, borderRadius: 4,
+    paddingVertical: S.s05, alignItems: 'center',
+    shadowColor: C.buttonPrimary, shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
   },
-  addBtnOff: { backgroundColor: '#1C1C28', shadowOpacity: 0, elevation: 0 },
-  addBtnText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700', letterSpacing: 0.5 },
+  addBtnOff: { backgroundColor: C.buttonDisabled, shadowOpacity: 0, elevation: 0 },
+  addBtnText: { color: C.textOnColor, fontSize: 17, fontFamily: F.semiBold, letterSpacing: 0.5 },
 });

@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Task } from '../types/task';
 import { CategoryBadge, PriorityBadge } from './TagBadge';
+import { C, S, F, TS } from '../lib/theme';
 
 interface Props {
   task: Task | null;
@@ -21,7 +22,7 @@ interface Props {
   onSave: (updated: Task) => void;
 }
 
-// ── 日期選擇器（與 VoiceModal 相同邏輯）─────────────────────────
+// ── 日期選擇器 ──────────────────────────────────────────────────
 const ITEM_H = 48;
 const todayDate = new Date();
 const YEARS = [todayDate.getFullYear(), todayDate.getFullYear() + 1, todayDate.getFullYear() + 2];
@@ -88,18 +89,18 @@ const col = StyleSheet.create({
   wrap: { flex: 1, alignItems: 'center' },
   scrollWrap: { height: ITEM_H * 5, overflow: 'hidden', width: '100%' },
   item: { height: ITEM_H, justifyContent: 'center', alignItems: 'center' },
-  text: { fontSize: 20, color: '#40405A', fontWeight: '400' },
-  textSel: { fontSize: 22, color: '#EAEAF0', fontWeight: '700' },
+  text: { fontSize: 20, color: C.textDisabled, fontFamily: F.regular },
+  textSel: { fontSize: 22, color: C.textPrimary, fontFamily: F.semiBold },
   highlight: {
     height: ITEM_H, marginHorizontal: 6,
-    backgroundColor: 'rgba(107,133,240,0.12)',
-    borderRadius: 10, borderWidth: 1,
-    borderColor: 'rgba(107,133,240,0.22)',
+    backgroundColor: C.interactiveHighlight,
+    borderRadius: 4, borderWidth: 1,
+    borderColor: C.interactiveBorder,
   },
-  label: { fontSize: 12, color: '#7878A0', marginTop: 8, fontWeight: '500' },
+  label: { fontSize: TS.label01, color: C.textSecondary, marginTop: S.s03, fontFamily: F.regular },
 });
 
-// ── 工具 ──────────────────────────────────────────────────────────
+// ── 工具 ────────────────────────────────────────────────────────
 function formatDateTime(isoString: string): string {
   const d = new Date(isoString);
   const year = d.getFullYear();
@@ -191,16 +192,10 @@ export default function TaskDetailModal({ task, visible, onClose, onSave }: Prop
   }
 
   function handleBackPress() {
-    if (showDatePicker) {
-      setShowDatePicker(false);
-    } else if (isEditing) {
-      setIsEditing(false);
-    } else {
-      onClose();
-    }
+    if (showDatePicker) { setShowDatePicker(false); }
+    else if (isEditing) { setIsEditing(false); }
+    else { onClose(); }
   }
-
-  const headerTitle = isEditing ? '編輯' : '詳情';
 
   return (
     <Modal
@@ -223,13 +218,9 @@ export default function TaskDetailModal({ task, visible, onClose, onSave }: Prop
                 <Text style={styles.editText}>✎ 編輯</Text>
               </TouchableOpacity>
             )}
-            <Text style={styles.title}>{headerTitle}</Text>
+            <Text style={styles.title}>{isEditing ? '編輯' : '詳情'}</Text>
             {isEditing ? (
-              <TouchableOpacity
-                onPress={handleSave}
-                style={styles.headerBtn}
-                disabled={!editTarget.trim()}
-              >
+              <TouchableOpacity onPress={handleSave} style={styles.headerBtn} disabled={!editTarget.trim()}>
                 <Text style={[styles.saveText, !editTarget.trim() && styles.saveTextOff]}>儲存</Text>
               </TouchableOpacity>
             ) : (
@@ -321,7 +312,6 @@ export default function TaskDetailModal({ task, visible, onClose, onSave }: Prop
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
               >
-                {/* 動作/名稱 */}
                 <View style={styles.fieldCard}>
                   <Text style={styles.fieldLabel}>動作／分類</Text>
                   <TextInput
@@ -329,7 +319,7 @@ export default function TaskDetailModal({ task, visible, onClose, onSave }: Prop
                     value={editAction}
                     onChangeText={setEditAction}
                     placeholder="例：買、寄、回電"
-                    placeholderTextColor="#646490"
+                    placeholderTextColor={C.textPlaceholder}
                   />
                 </View>
 
@@ -340,11 +330,10 @@ export default function TaskDetailModal({ task, visible, onClose, onSave }: Prop
                     value={editTarget}
                     onChangeText={setEditTarget}
                     placeholder="對象或物品"
-                    placeholderTextColor="#646490"
+                    placeholderTextColor={C.textPlaceholder}
                   />
                 </View>
 
-                {/* 時間 */}
                 <TouchableOpacity
                   style={styles.fieldCard}
                   onPress={() => setShowDatePicker(true)}
@@ -366,7 +355,6 @@ export default function TaskDetailModal({ task, visible, onClose, onSave }: Prop
                   </View>
                 </TouchableOpacity>
 
-                {/* 備註 */}
                 <View style={styles.fieldCard}>
                   <Text style={styles.fieldLabel}>備註</Text>
                   <TextInput
@@ -374,13 +362,12 @@ export default function TaskDetailModal({ task, visible, onClose, onSave }: Prop
                     value={editNotes}
                     onChangeText={setEditNotes}
                     placeholder="補充說明（選填）"
-                    placeholderTextColor="#646490"
+                    placeholderTextColor={C.textPlaceholder}
                     multiline
                     textAlignVertical="top"
                   />
                 </View>
 
-                {/* 優先級 */}
                 <TouchableOpacity
                   style={[styles.urgentToggle, isUrgent && styles.urgentToggleOn]}
                   onPress={() => setIsUrgent(!isUrgent)}
@@ -391,7 +378,6 @@ export default function TaskDetailModal({ task, visible, onClose, onSave }: Prop
                 </TouchableOpacity>
               </ScrollView>
 
-              {/* 儲存按鈕（底部固定） */}
               <View style={styles.saveBtnWrap}>
                 <TouchableOpacity
                   style={[styles.saveBtn, !editTarget.trim() && styles.saveBtnOff]}
@@ -412,110 +398,109 @@ export default function TaskDetailModal({ task, visible, onClose, onSave }: Prop
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0E0E11' },
-  container: { flex: 1, backgroundColor: '#0E0E11' },
+  safe: { flex: 1, backgroundColor: C.background },
+  container: { flex: 1, backgroundColor: C.background },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#282840',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: S.s05, paddingHorizontal: S.s06,
+    borderBottomWidth: 1, borderBottomColor: C.layer02,
   },
-  title: { fontSize: 16, fontWeight: '700', color: '#EAEAF0' },
-  headerBtn: { minWidth: 60, paddingVertical: 4, paddingHorizontal: 2 },
-  editText: { fontSize: 14, color: '#6B85F0', fontWeight: '600' },
-  cancelText: { fontSize: 14, color: '#7878A0' },
-  saveText: { fontSize: 14, color: '#6B85F0', fontWeight: '700', textAlign: 'right' },
-  saveTextOff: { color: '#40406A' },
+  title: { fontSize: TS.body02, fontWeight: '600', fontFamily: F.semiBold, color: C.textPrimary },
+  headerBtn: { minWidth: 60, paddingVertical: S.s02 },
+  editText: { fontSize: TS.body01, color: C.interactive, fontFamily: F.regular },
+  cancelText: { fontSize: TS.body01, color: C.textSecondary, fontFamily: F.regular },
+  saveText: { fontSize: TS.body01, color: C.interactive, fontFamily: F.semiBold, textAlign: 'right' },
+  saveTextOff: { color: C.textDisabled },
   closeBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'flex-end' },
-  closeBtnText: { fontSize: 18, color: '#7878A0' },
+  closeBtnText: { fontSize: 18, color: C.textSecondary },
 
-  // View mode
-  body: { padding: 20, gap: 10 },
+  body: { padding: S.s06, gap: S.s03 },
+
   heroCard: {
-    backgroundColor: '#17171C', borderRadius: 16, padding: 20, marginBottom: 4, gap: 8,
+    backgroundColor: C.layer01, borderRadius: 4,
+    padding: S.s06, marginBottom: S.s02, gap: S.s03,
   },
   heroAction: {
-    fontSize: 11, fontWeight: '700', color: '#6B85F0',
+    fontSize: 11, fontWeight: '600', fontFamily: F.semiBold, color: C.interactive,
     letterSpacing: 1.5, textTransform: 'uppercase',
   },
-  heroTarget: { fontSize: 24, fontWeight: '800', color: '#EAEAF0', lineHeight: 32 },
-  heroBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  heroTarget: { fontSize: TS.heading04, fontWeight: '700', fontFamily: F.bold, color: C.textPrimary, lineHeight: 36 },
+  heroBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: S.s02, marginTop: S.s02 },
   completedBadge: {
-    backgroundColor: 'rgba(61, 204, 136, 0.1)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4,
+    backgroundColor: C.supportSuccessBg, borderRadius: 4,
+    paddingHorizontal: S.s03, paddingVertical: S.s02,
   },
-  completedBadgeText: { fontSize: 12, color: '#3DCC88', fontWeight: '600' },
+  completedBadgeText: { fontSize: 12, color: C.supportSuccess, fontFamily: F.semiBold },
+
   row: {
-    backgroundColor: '#17171C', borderRadius: 12, padding: 14,
-    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
+    backgroundColor: C.layer01, borderRadius: 4, padding: S.s04,
+    flexDirection: 'row', alignItems: 'flex-start', gap: S.s04,
   },
-  rowIcon: { fontSize: 16, color: '#7878A0', marginTop: 1 },
+  rowIcon: { fontSize: 16, color: C.textSecondary, marginTop: 1 },
   rowContent: { flex: 1 },
   rowLabel: {
-    fontSize: 11, color: '#646490', fontWeight: '600',
-    marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.8,
+    fontSize: TS.label01, color: C.textHelper, fontFamily: F.semiBold,
+    marginBottom: S.s02, textTransform: 'uppercase', letterSpacing: 0.8,
   },
-  rowValue: { fontSize: 15, color: '#EAEAF0', fontWeight: '500' },
+  rowValue: { fontSize: TS.body02, color: C.textPrimary, fontFamily: F.regular },
+
   rawCard: {
-    backgroundColor: '#17171C', borderRadius: 12, padding: 16,
-    borderLeftWidth: 2, borderLeftColor: '#6B85F0',
+    backgroundColor: C.layer01, borderRadius: 4, padding: S.s05,
+    borderLeftWidth: 2, borderLeftColor: C.interactive,
   },
   rawLabel: {
-    fontSize: 11, color: '#6B85F0', fontWeight: '700',
-    marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8,
+    fontSize: TS.label01, color: C.interactive, fontFamily: F.semiBold,
+    marginBottom: S.s03, textTransform: 'uppercase', letterSpacing: 0.8,
   },
-  rawText: { fontSize: 14, color: '#7878A0', fontStyle: 'italic', lineHeight: 20 },
+  rawText: { fontSize: TS.body01, color: C.textHelper, fontFamily: F.regular, fontStyle: 'italic', lineHeight: 20 },
 
-  // Edit mode
-  fieldCard: { backgroundColor: '#17171C', borderRadius: 12, padding: 14 },
+  fieldCard: { backgroundColor: C.layer01, borderRadius: 4, padding: S.s04 },
   fieldLabel: {
-    fontSize: 11, color: '#646490', fontWeight: '600',
-    marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.8,
+    fontSize: TS.label01, color: C.textHelper, fontFamily: F.semiBold,
+    marginBottom: S.s03, textTransform: 'uppercase', letterSpacing: 0.8,
   },
   fieldInput: {
-    fontSize: 16, color: '#EAEAF0',
-    borderBottomWidth: 1, borderBottomColor: '#40406A', paddingVertical: 4,
+    fontSize: TS.body02, color: C.textPrimary, fontFamily: F.regular,
+    borderBottomWidth: 1, borderBottomColor: C.borderSubtle01, paddingVertical: S.s02,
   },
-  fieldPlaceholder: { color: '#646490' },
+  fieldPlaceholder: { color: C.textPlaceholder },
   notesInput: { minHeight: 56, borderBottomWidth: 0 },
-  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  timeClear: { fontSize: 14, color: '#646490', padding: 2 },
+  timeRow: { flexDirection: 'row', alignItems: 'center', gap: S.s03 },
+  timeClear: { fontSize: 14, color: C.textHelper, padding: S.s01 },
   urgentToggle: {
-    backgroundColor: '#17171C', borderRadius: 12, padding: 14,
-    alignItems: 'center', borderWidth: 1, borderColor: '#40406A',
+    backgroundColor: C.layer01, borderRadius: 4, padding: S.s04,
+    alignItems: 'center', borderWidth: 1, borderColor: C.borderSubtle01,
   },
   urgentToggleOn: {
-    backgroundColor: 'rgba(245,101,101,0.08)', borderColor: 'rgba(245,101,101,0.3)',
+    backgroundColor: C.supportErrorBg, borderColor: C.supportErrorBorder,
   },
-  urgentToggleText: { fontSize: 14, color: '#646490', fontWeight: '500' },
-  urgentToggleTextOn: { color: '#F56565', fontWeight: '700' },
+  urgentToggleText: { fontSize: TS.body01, color: C.textHelper, fontFamily: F.regular },
+  urgentToggleTextOn: { color: C.supportError, fontFamily: F.semiBold },
+
   saveBtnWrap: {
-    paddingHorizontal: 24,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
-    paddingTop: 12,
-    borderTopWidth: 1, borderTopColor: '#282840',
+    paddingHorizontal: S.s06,
+    paddingBottom: Platform.OS === 'ios' ? 34 : S.s06,
+    paddingTop: S.s04,
+    borderTopWidth: 1, borderTopColor: C.layer02,
   },
   saveBtn: {
-    backgroundColor: '#6B85F0', borderRadius: 14,
-    paddingVertical: 16, alignItems: 'center',
-    shadowColor: '#6B85F0', shadowOffset: { width: 0, height: 0 },
+    backgroundColor: C.buttonPrimary, borderRadius: 4,
+    paddingVertical: S.s05, alignItems: 'center',
+    shadowColor: C.buttonPrimary, shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
   },
-  saveBtnOff: { backgroundColor: '#1C1C28', shadowOpacity: 0, elevation: 0 },
-  saveBtnText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700', letterSpacing: 0.5 },
+  saveBtnOff: { backgroundColor: C.buttonDisabled, shadowOpacity: 0, elevation: 0 },
+  saveBtnText: { color: C.textOnColor, fontSize: 17, fontFamily: F.semiBold, letterSpacing: 0.5 },
 
-  // Date picker
-  dateOverlay: { flex: 1, backgroundColor: '#0E0E11' },
+  dateOverlay: { flex: 1, backgroundColor: C.background },
   dateHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#282840',
+    paddingHorizontal: S.s06, paddingVertical: S.s04,
+    borderBottomWidth: 1, borderBottomColor: C.layer02,
   },
-  dateBtn: { paddingHorizontal: 4, paddingVertical: 4 },
-  dateTitle: { fontSize: 16, fontWeight: '700', color: '#EAEAF0' },
-  dateCancel: { fontSize: 15, color: '#7878A0' },
-  dateConfirm: { fontSize: 15, color: '#6B85F0', fontWeight: '700' },
-  dateCols: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 24 },
+  dateBtn: { paddingHorizontal: S.s02, paddingVertical: S.s02 },
+  dateTitle: { fontSize: TS.body02, fontFamily: F.semiBold, color: C.textPrimary },
+  dateCancel: { fontSize: TS.body02, color: C.textSecondary, fontFamily: F.regular },
+  dateConfirm: { fontSize: TS.body02, color: C.interactive, fontFamily: F.semiBold },
+  dateCols: { flexDirection: 'row', paddingHorizontal: S.s05, paddingTop: S.s06 },
 });
