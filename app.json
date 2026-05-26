@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "語音待辦",
+    "slug": "voice-todo",
+    "version": "1.0.0",
+    "owner": "kurumi030",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "允許「語音待辦」使用語音辨識功能。",
+        "NSMicrophoneUsageDescription": "允許「語音待辦」使用麥克風進行語音輸入。"
+      }
+    },
+    "android": {
+      "package": "com.kurumi030.voicetodo",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "允許「語音待辦」使用麥克風進行語音輸入。",
+          "speechRecognitionPermission": "允許「語音待辦」使用語音辨識功能。"
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "updates": {
+      "url": "https://u.expo.dev/e3cae1c6-68f4-4230-9484-6274794f5307"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e3cae1c6-68f4-4230-9484-6274794f5307"
+      }
+    }
+  }
+}
