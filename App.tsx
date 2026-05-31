@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import * as Updates from 'expo-updates';
 import {
   useFonts,
   IBMPlexSans_400Regular,
@@ -27,20 +26,7 @@ export default function App() {
 
   useEffect(() => {
     loadApiKey().then((key) => setApiKey(key ?? ''));
-    if (!__DEV__) checkAndApplyUpdate();
   }, []);
-
-  async function checkAndApplyUpdate() {
-    try {
-      const result = await Updates.checkForUpdateAsync();
-      if (result.isAvailable) {
-        await Updates.fetchUpdateAsync();
-        await Updates.reloadAsync();
-      }
-    } catch {
-      // 無網路或非 OTA 環境時忽略
-    }
-  }
 
   if (!fontsLoaded) {
     return <View style={{ flex: 1, backgroundColor: C.background }} />;
