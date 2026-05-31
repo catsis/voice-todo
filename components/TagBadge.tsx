@@ -70,15 +70,15 @@ export function PriorityBadge({ priority }: PriorityBadgeProps) {
 
 const styles = StyleSheet.create({
   badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 9,
     alignSelf: 'flex-start',
   },
   small: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 2,
+    borderRadius: 6,
   },
   text: {
     fontSize: 13,
@@ -90,9 +90,9 @@ const styles = StyleSheet.create({
   },
   urgentBadge: {
     backgroundColor: C.supportErrorBg,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 9,
     borderWidth: 1,
     borderColor: C.supportErrorBorder,
   },

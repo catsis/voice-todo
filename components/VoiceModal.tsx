@@ -13,8 +13,9 @@ import {
   Platform,
   Alert,
   KeyboardAvoidingView,
+  Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
@@ -31,6 +32,8 @@ interface Props {
   onClose: () => void;
   onAdd: (task: Omit<Task, 'id' | 'createdAt' | 'completed'>) => void;
 }
+
+const SCREEN_H = Dimensions.get('window').height;
 
 // ── 日期選擇器 ──────────────────────────────────────────────────
 const ITEM_H = 48;
@@ -137,11 +140,12 @@ export function MicIcon({ size = 28, color = '#FFFFFF' }: { size?: number; color
 
 function StopIcon({ size = 20, color = '#FFFFFF' }: { size?: number; color?: string }) {
   const s = Math.round(size * 0.52);
-  return <View style={{ width: s, height: s, borderRadius: 2, backgroundColor: color }} />;
+  return <View style={{ width: s, height: s, borderRadius: 3, backgroundColor: color }} />;
 }
 
 // ── 主元件 ────────────────────────────────────────────────────
 export default function VoiceModal({ visible, apiKey, onClose, onAdd }: Props) {
+  const insets = useSafeAreaInsets();
   const [stage, setStage] = useState<Stage>('idle');
   const [transcript, setTranscript] = useState('');
   const [rawInput, setRawInput] = useState('');
@@ -174,7 +178,7 @@ export default function VoiceModal({ visible, apiKey, onClose, onAdd }: Props) {
     if (stage === 'recording') {
       pulseLoop.current = Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.6, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1.65, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
           Animated.timing(pulseAnim, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
         ])
       );
@@ -275,228 +279,270 @@ export default function VoiceModal({ visible, apiKey, onClose, onAdd }: Props) {
     setShowDatePicker(false);
   }
 
+  function handleBackdropPress() {
+    if (stage !== 'recording') onClose();
+  }
+
   const canAdd = stage === 'result' && editTarget.trim().length > 0;
-  const isVoiceStage = stage === 'idle' || stage === 'recording' || stage === 'transcribed';
-  const headerTitle = stage === 'result' ? '確認內容' : stage === 'processing' ? 'AI 分析中' : '語音輸入';
+  const isResultStage = stage === 'result';
+  const bottomPad = Math.max(insets.bottom, S.s05);
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={s.safe} edges={['top']}>
-        <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      statusBarTranslucent
+      onRequestClose={() => stage !== 'recording' && onClose()}
+    >
+      <View style={s.overlay}>
+        {/* Backdrop – tap to close */}
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          activeOpacity={1}
+          onPress={handleBackdropPress}
+        />
 
-          {/* Header */}
-          <View style={s.header}>
-            <TouchableOpacity onPress={onClose} style={s.closeBtn}>
-              <Text style={s.closeBtnText}>✕</Text>
-            </TouchableOpacity>
-            <Text style={s.title}>{headerTitle}</Text>
-            <View style={{ width: 44 }} />
-          </View>
+        {/* Bottom sheet */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={[s.sheet, isResultStage && s.sheetLarge]}>
+            {/* Drag handle */}
+            <View style={s.handle} />
 
-          {/* 日期選擇器覆蓋 */}
-          {showDatePicker && (
-            <View style={s.dateOverlay}>
-              <View style={s.dateHeader}>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)} style={s.dateBtn}>
-                  <Text style={s.dateCancel}>取消</Text>
-                </TouchableOpacity>
-                <Text style={s.dateTitle}>選擇日期</Text>
-                <TouchableOpacity onPress={confirmDate} style={s.dateBtn}>
-                  <Text style={s.dateConfirm}>確認</Text>
-                </TouchableOpacity>
+            {/* ── 日期選擇器 ── */}
+            {showDatePicker && (
+              <View style={s.dateWrap}>
+                <View style={s.dateHeader}>
+                  <TouchableOpacity onPress={() => setShowDatePicker(false)} style={s.dateBtn}>
+                    <Text style={s.dateCancel}>取消</Text>
+                  </TouchableOpacity>
+                  <Text style={s.dateTitle}>選擇日期</Text>
+                  <TouchableOpacity onPress={confirmDate} style={s.dateBtn}>
+                    <Text style={s.dateConfirm}>確認</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={s.dateCols}>
+                  <PickerColumn items={YEARS} selectedValue={pickerYear} onSelect={setPickerYear} label="年" />
+                  <PickerColumn items={MONTHS} selectedValue={pickerMonth} onSelect={setPickerMonth} label="月" />
+                  <PickerColumn items={days} selectedValue={pickerDay} onSelect={setPickerDay} label="日" />
+                </View>
               </View>
-              <View style={s.dateCols}>
-                <PickerColumn items={YEARS} selectedValue={pickerYear} onSelect={setPickerYear} label="年" />
-                <PickerColumn items={MONTHS} selectedValue={pickerMonth} onSelect={setPickerMonth} label="月" />
-                <PickerColumn items={days} selectedValue={pickerDay} onSelect={setPickerDay} label="日" />
-              </View>
-            </View>
-          )}
+            )}
 
-          {/* ── 語音輸入階段 ── */}
-          {isVoiceStage && !showDatePicker && (
-            <View style={s.voiceWrap}>
-              <View style={s.voiceCenter}>
-                {transcript || stage === 'transcribed' ? (
-                  <TextInput
-                    style={s.transcriptInput}
-                    value={transcript}
-                    onChangeText={stage !== 'recording' ? setTranscript : undefined}
-                    editable={stage !== 'recording'}
-                    multiline
-                    textAlign="center"
-                    textAlignVertical="center"
-                    placeholder="說出你要做的事…"
-                    placeholderTextColor={C.textDisabled}
-                  />
-                ) : (
-                  <Text style={s.hintText}>說出你要做的事…</Text>
-                )}
-              </View>
+            {/* ── idle / recording 階段 ── */}
+            {(stage === 'idle' || stage === 'recording') && !showDatePicker && (
+              <View style={s.voiceStage}>
+                <Text style={s.hintText}>
+                  {stage === 'recording' && transcript ? transcript : '說出你要做的事…'}
+                </Text>
 
-              <View style={s.micBar}>
-                {stage === 'transcribed' ? (
-                  <View style={s.transcribedRow}>
-                    <TouchableOpacity onPress={startRecording} style={s.reRecordBtn}>
-                      <MicIcon size={20} color={C.textSecondary} />
-                    </TouchableOpacity>
+                <View style={s.micRow}>
+                  {/* 左側佔位 (對齊用) */}
+                  <View style={{ width: 44 }} />
+
+                  {/* MicFAB */}
+                  <View style={s.micCenter}>
+                    <Animated.View style={[
+                      s.micPulse,
+                      { transform: [{ scale: pulseAnim }] },
+                      stage === 'recording' && s.micPulseRec,
+                    ]} />
                     <TouchableOpacity
-                      onPress={handleAnalyze}
-                      style={[s.analyzeBtn, !transcript.trim() && s.analyzeBtnOff]}
-                      disabled={!transcript.trim()}
+                      onPress={handleMicPress}
+                      style={[s.micFab, stage === 'recording' && s.micFabRec]}
                       activeOpacity={0.85}
                     >
-                      <Text style={s.analyzeBtnText}>分析</Text>
+                      {stage === 'recording'
+                        ? <StopIcon size={28} />
+                        : <MicIcon size={28} />}
                     </TouchableOpacity>
                   </View>
-                ) : (
-                  <View style={s.micRowWrap}>
-                    {stage === 'idle' && <View style={s.micSpacer} />}
 
-                    <View style={s.micCenter}>
-                      <Animated.View style={[
-                        s.micPulse,
-                        { transform: [{ scale: pulseAnim }] },
-                        stage === 'recording' && s.micPulseRec,
-                      ]} />
-                      <TouchableOpacity
-                        onPress={handleMicPress}
-                        style={[s.micFab, stage === 'recording' && s.micFabRec]}
-                        activeOpacity={0.85}
-                      >
-                        {stage === 'recording'
-                          ? <StopIcon size={28} />
-                          : <MicIcon size={28} />}
-                      </TouchableOpacity>
-                    </View>
-
-                    {stage === 'idle' && (
-                      <TouchableOpacity
-                        onPress={handleManualInput}
-                        style={s.manualBtn}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={s.manualBtnText}>✎</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                )}
-              </View>
-            </View>
-          )}
-
-          {/* ── 分析中 ── */}
-          {stage === 'processing' && !showDatePicker && (
-            <View style={s.processingArea}>
-              <ActivityIndicator size="large" color={C.interactive} />
-              <Text style={s.processingText}>AI 分析中</Text>
-              <Text style={s.processingRaw}>「{rawInput}」</Text>
-            </View>
-          )}
-
-          {/* ── 確認結果 ── */}
-          {stage === 'result' && !showDatePicker && (
-            <ScrollView
-              contentContainerStyle={s.resultBody}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              <View style={s.autoCard}>
-                <View style={s.autoRow}>
-                  <View style={s.statusBadge}>
-                    <Text style={s.statusBadgeText}>待辦</Text>
-                  </View>
-                  {editAction && editAction !== '待辦' && (
-                    <View style={s.actionBadge}>
-                      <Text style={s.actionBadgeText}>{editAction}</Text>
-                    </View>
-                  )}
-                  {isUrgent && (
-                    <View style={s.urgentBadge}>
-                      <Text style={s.urgentBadgeText}>急</Text>
-                    </View>
+                  {/* 手動輸入按鈕 (idle 才顯示) */}
+                  {stage === 'idle' ? (
+                    <TouchableOpacity
+                      onPress={handleManualInput}
+                      style={s.manualBtn}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={s.manualBtnText}>✎</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={{ width: 44 }} />
                   )}
                 </View>
-                <Text style={s.autoRaw}>「{rawInput}」</Text>
+
+                <View style={{ height: bottomPad }} />
               </View>
+            )}
 
-              <View style={s.fieldCard}>
-                <Text style={s.fieldLabel}>名稱</Text>
+            {/* ── transcribed 階段 ── */}
+            {stage === 'transcribed' && !showDatePicker && (
+              <View style={s.voiceStage}>
                 <TextInput
-                  style={s.fieldInput}
-                  value={editTarget}
-                  onChangeText={setEditTarget}
-                  placeholder="對象或物品"
-                  placeholderTextColor={C.textPlaceholder}
-                />
-              </View>
-
-              <TouchableOpacity style={s.fieldCard} onPress={() => setShowDatePicker(true)} activeOpacity={0.7}>
-                <Text style={s.fieldLabel}>時間</Text>
-                <Text style={[s.fieldInput, !editTime && s.fieldPlaceholder]}>
-                  {editTime || '選擇日期'}
-                </Text>
-              </TouchableOpacity>
-
-              <View style={s.fieldCard}>
-                <Text style={s.fieldLabel}>備註</Text>
-                <TextInput
-                  style={[s.fieldInput, s.notesInput]}
-                  value={editNotes}
-                  onChangeText={setEditNotes}
-                  placeholder="補充說明（選填）"
-                  placeholderTextColor={C.textPlaceholder}
+                  style={s.transcriptInput}
+                  value={transcript}
+                  onChangeText={setTranscript}
                   multiline
-                  textAlignVertical="top"
+                  textAlign="center"
+                  textAlignVertical="center"
+                  placeholder="輸入要辦的事…"
+                  placeholderTextColor={C.textDisabled}
+                  autoFocus
                 />
+
+                <View style={s.transcribedRow}>
+                  <TouchableOpacity onPress={startRecording} style={s.reRecordBtn}>
+                    <MicIcon size={20} color={C.textSecondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleAnalyze}
+                    style={[s.analyzeBtn, !transcript.trim() && s.analyzeBtnOff]}
+                    disabled={!transcript.trim()}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={s.analyzeBtnText}>分析</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ height: bottomPad }} />
               </View>
+            )}
 
-              <TouchableOpacity
-                style={[s.urgentToggle, isUrgent && s.urgentToggleOn]}
-                onPress={() => setIsUrgent(!isUrgent)}
-              >
-                <Text style={[s.urgentToggleText, isUrgent && s.urgentToggleTextOn]}>
-                  {isUrgent ? '● 緊急' : '○ 一般'}
-                </Text>
-              </TouchableOpacity>
-            </ScrollView>
-          )}
+            {/* ── processing 階段 ── */}
+            {stage === 'processing' && !showDatePicker && (
+              <View style={s.processingArea}>
+                <ActivityIndicator size="large" color={C.interactive} />
+                <Text style={s.processingText}>AI 分析中</Text>
+                <Text style={s.processingRaw}>「{rawInput}」</Text>
+                <View style={{ height: bottomPad }} />
+              </View>
+            )}
 
-          {/* 新增按鈕 */}
-          {stage === 'result' && !showDatePicker && (
-            <View style={s.addBtnWrap}>
-              <TouchableOpacity
-                style={[s.addBtn, !canAdd && s.addBtnOff]}
-                onPress={handleAdd}
-                disabled={!canAdd}
-                activeOpacity={0.85}
-              >
-                <Text style={s.addBtnText}>新增</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+            {/* ── result 階段 ── */}
+            {stage === 'result' && !showDatePicker && (
+              <>
+                <ScrollView
+                  contentContainerStyle={s.resultBody}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                >
+                  <View style={s.autoCard}>
+                    <View style={s.autoRow}>
+                      <View style={s.statusBadge}>
+                        <Text style={s.statusBadgeText}>待辦</Text>
+                      </View>
+                      {editAction && editAction !== '待辦' && (
+                        <View style={s.actionBadge}>
+                          <Text style={s.actionBadgeText}>{editAction}</Text>
+                        </View>
+                      )}
+                      {isUrgent && (
+                        <View style={s.urgentBadge}>
+                          <Text style={s.urgentBadgeText}>急</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={s.autoRaw}>「{rawInput}」</Text>
+                  </View>
 
+                  <View style={s.fieldCard}>
+                    <Text style={s.fieldLabel}>名稱</Text>
+                    <TextInput
+                      style={s.fieldInput}
+                      value={editTarget}
+                      onChangeText={setEditTarget}
+                      placeholder="對象或物品"
+                      placeholderTextColor={C.textPlaceholder}
+                    />
+                  </View>
+
+                  <TouchableOpacity style={s.fieldCard} onPress={() => setShowDatePicker(true)} activeOpacity={0.7}>
+                    <Text style={s.fieldLabel}>時間</Text>
+                    <Text style={[s.fieldInput, !editTime && s.fieldPlaceholder]}>
+                      {editTime || '選擇日期'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <View style={s.fieldCard}>
+                    <Text style={s.fieldLabel}>備註</Text>
+                    <TextInput
+                      style={[s.fieldInput, s.notesInput]}
+                      value={editNotes}
+                      onChangeText={setEditNotes}
+                      placeholder="補充說明（選填）"
+                      placeholderTextColor={C.textPlaceholder}
+                      multiline
+                      textAlignVertical="top"
+                    />
+                  </View>
+
+                  <TouchableOpacity
+                    style={[s.urgentToggle, isUrgent && s.urgentToggleOn]}
+                    onPress={() => setIsUrgent(!isUrgent)}
+                  >
+                    <Text style={[s.urgentToggleText, isUrgent && s.urgentToggleTextOn]}>
+                      {isUrgent ? '● 緊急' : '○ 一般'}
+                    </Text>
+                  </TouchableOpacity>
+                </ScrollView>
+
+                <View style={[s.addBtnWrap, { paddingBottom: bottomPad }]}>
+                  <TouchableOpacity
+                    style={[s.addBtn, !canAdd && s.addBtnOff]}
+                    onPress={handleAdd}
+                    disabled={!canAdd}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={s.addBtnText}>新增</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.background },
-  container: { flex: 1, backgroundColor: C.background },
-
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: S.s05, paddingHorizontal: S.s06,
-    borderBottomWidth: 1, borderBottomColor: C.layer02,
+  // Overlay
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
   },
-  closeBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
-  closeBtnText: { fontSize: 18, color: C.textSecondary },
-  title: { fontSize: TS.body02, fontFamily: F.semiBold, color: C.textPrimary },
+
+  // Sheet
+  sheet: {
+    backgroundColor: C.layer01,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: C.borderSubtle02,
+    overflow: 'hidden',
+  },
+  sheetLarge: {
+    maxHeight: SCREEN_H * 0.82,
+  },
+
+  // Drag handle
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: C.borderSubtle02,
+    alignSelf: 'center',
+    marginTop: S.s04,
+    marginBottom: S.s03,
+  },
 
   // Date picker
-  dateOverlay: { flex: 1, backgroundColor: C.background },
+  dateWrap: { paddingBottom: S.s06 },
   dateHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: S.s06, paddingVertical: S.s04,
@@ -508,92 +554,102 @@ const s = StyleSheet.create({
   dateConfirm: { fontSize: TS.body02, color: C.interactive, fontFamily: F.semiBold },
   dateCols: { flexDirection: 'row', paddingHorizontal: S.s05, paddingTop: S.s06 },
 
-  // Voice stage
-  voiceWrap: { flex: 1, flexDirection: 'column' },
-  voiceCenter: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: S.s07 },
-  hintText: { fontSize: 18, color: C.textDisabled, textAlign: 'center', fontFamily: F.regular },
-  transcriptInput: {
-    fontSize: 22, color: C.textPrimary, textAlign: 'center', fontFamily: F.regular,
-    width: '100%', padding: S.s05, lineHeight: 32,
+  // Voice stage wrapper
+  voiceStage: { paddingHorizontal: S.s07 },
+  hintText: {
+    fontSize: 18, color: C.textHelper, textAlign: 'center',
+    fontFamily: F.regular, marginTop: S.s06, marginBottom: S.s07,
+    minHeight: 60,
   },
 
-  // Mic bar
-  micBar: {
-    paddingHorizontal: S.s07,
-    paddingBottom: Platform.OS === 'ios' ? 44 : 36,
-    paddingTop: S.s05,
+  // Mic row (idle / recording)
+  micRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: S.s06,
+    marginBottom: S.s06,
   },
-  micRowWrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: S.s06 },
-  micSpacer: { width: 44 },
   micCenter: { alignItems: 'center' },
   micPulse: {
     position: 'absolute',
     width: 96, height: 96, borderRadius: 48,
-    backgroundColor: 'rgba(15,98,254,0.1)',
+    backgroundColor: 'rgba(47,107,255,0.1)',
   },
-  micPulseRec: { backgroundColor: 'rgba(218,30,40,0.1)' },
+  micPulseRec: { backgroundColor: 'rgba(255,90,106,0.1)' },
   micFab: {
     width: 72, height: 72, borderRadius: 36,
     backgroundColor: C.buttonPrimary,
     justifyContent: 'center', alignItems: 'center',
-    shadowColor: C.buttonPrimary, shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7, shadowRadius: 22, elevation: 14,
+    shadowColor: C.buttonPrimary, shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.6, shadowRadius: 20, elevation: 14,
   },
   micFabRec: { backgroundColor: C.supportError, shadowColor: C.supportError },
   manualBtn: {
     width: 44, height: 44, borderRadius: 22,
-    borderWidth: 1.5, borderColor: C.borderSubtle01,
+    borderWidth: 1.5, borderColor: C.borderSubtle02,
     justifyContent: 'center', alignItems: 'center',
   },
   manualBtnText: { fontSize: 20, color: C.textSecondary },
 
-  // Transcribed
-  transcribedRow: { flexDirection: 'row', gap: S.s04, alignItems: 'center' },
+  // Transcript input (transcribed stage)
+  transcriptInput: {
+    fontSize: 20, color: C.textPrimary, textAlign: 'center',
+    fontFamily: F.regular, width: '100%',
+    paddingVertical: S.s05, lineHeight: 30,
+    minHeight: 80, marginTop: S.s04,
+  },
+  transcribedRow: {
+    flexDirection: 'row', gap: S.s04, alignItems: 'center', marginBottom: S.s06,
+  },
   reRecordBtn: {
     width: 56, height: 56, borderRadius: 28,
-    borderWidth: 1.5, borderColor: C.borderSubtle01,
+    borderWidth: 1.5, borderColor: C.borderSubtle02,
     justifyContent: 'center', alignItems: 'center',
   },
   analyzeBtn: {
-    flex: 1, backgroundColor: C.buttonPrimary, borderRadius: 4,
+    flex: 1, backgroundColor: C.buttonPrimary, borderRadius: 12,
     paddingVertical: 17, alignItems: 'center',
-    shadowColor: C.buttonPrimary, shadowOffset: { width: 0, height: 0 },
+    shadowColor: C.buttonPrimary, shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
   },
-  analyzeBtnOff: { backgroundColor: C.layer01, shadowOpacity: 0, elevation: 0 },
+  analyzeBtnOff: { backgroundColor: C.layer02, shadowOpacity: 0, elevation: 0 },
   analyzeBtnText: { color: C.textOnColor, fontSize: 17, fontFamily: F.semiBold },
 
-  // Processing
-  processingArea: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: S.s05 },
+  // Processing stage
+  processingArea: {
+    justifyContent: 'center', alignItems: 'center',
+    gap: S.s05, paddingVertical: S.s09,
+  },
   processingText: { fontSize: TS.body02, color: C.interactive, fontFamily: F.semiBold },
   processingRaw: { fontSize: TS.body01, color: C.textHelper, fontFamily: F.regular, fontStyle: 'italic' },
 
-  // Result
-  resultBody: { padding: S.s06, gap: S.s03, paddingBottom: S.s05 },
+  // Result stage
+  resultBody: { padding: S.s06, gap: S.s03, paddingBottom: S.s04 },
   autoCard: {
-    backgroundColor: C.layer01, borderRadius: 4, padding: S.s04,
+    backgroundColor: C.layer02, borderRadius: 12, padding: S.s04,
     borderLeftWidth: 2, borderLeftColor: C.interactive, gap: S.s03,
   },
   autoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: S.s03 },
   statusBadge: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 4, paddingHorizontal: S.s03, paddingVertical: S.s02,
+    backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 9,
+    paddingHorizontal: S.s03, paddingVertical: S.s02,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
   statusBadgeText: { fontSize: 13, color: C.textSecondary, fontFamily: F.semiBold },
   actionBadge: {
-    backgroundColor: C.interactiveBg,
-    borderRadius: 4, paddingHorizontal: S.s03, paddingVertical: S.s02,
+    backgroundColor: C.interactiveBg, borderRadius: 9,
+    paddingHorizontal: S.s03, paddingVertical: S.s02,
   },
   actionBadgeText: { fontSize: 13, color: C.interactive, fontFamily: F.semiBold },
   urgentBadge: {
-    backgroundColor: C.supportErrorBg,
-    borderRadius: 4, paddingHorizontal: S.s03, paddingVertical: S.s02,
+    backgroundColor: C.supportErrorBg, borderRadius: 9,
+    paddingHorizontal: S.s03, paddingVertical: S.s02,
   },
   urgentBadgeText: { fontSize: 13, color: C.supportError, fontFamily: F.semiBold },
   autoRaw: { fontSize: TS.body01, color: C.textHelper, fontFamily: F.regular, fontStyle: 'italic' },
 
-  fieldCard: { backgroundColor: C.layer01, borderRadius: 4, padding: S.s04 },
+  fieldCard: { backgroundColor: C.layer02, borderRadius: 12, padding: S.s04 },
   fieldLabel: {
     fontSize: TS.label01, color: C.textHelper, fontFamily: F.semiBold,
     marginBottom: S.s03, textTransform: 'uppercase', letterSpacing: 0.8,
@@ -606,7 +662,7 @@ const s = StyleSheet.create({
   notesInput: { minHeight: 56, borderBottomWidth: 0 },
 
   urgentToggle: {
-    backgroundColor: C.layer01, borderRadius: 4, padding: S.s04,
+    backgroundColor: C.layer02, borderRadius: 12, padding: S.s04,
     alignItems: 'center', borderWidth: 1, borderColor: C.borderSubtle01,
   },
   urgentToggleOn: {
@@ -617,14 +673,13 @@ const s = StyleSheet.create({
 
   addBtnWrap: {
     paddingHorizontal: S.s06,
-    paddingBottom: Platform.OS === 'ios' ? 34 : S.s06,
     paddingTop: S.s04,
     borderTopWidth: 1, borderTopColor: C.layer02,
   },
   addBtn: {
-    backgroundColor: C.buttonPrimary, borderRadius: 4,
+    backgroundColor: C.buttonPrimary, borderRadius: 12,
     paddingVertical: S.s05, alignItems: 'center',
-    shadowColor: C.buttonPrimary, shadowOffset: { width: 0, height: 0 },
+    shadowColor: C.buttonPrimary, shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
   },
   addBtnOff: { backgroundColor: C.buttonDisabled, shadowOpacity: 0, elevation: 0 },

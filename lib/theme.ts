@@ -1,46 +1,48 @@
-// Carbon Design System v11 – Gray 100 (g100) theme
+// Design tokens – aligned with HTML prototype color system
 
 export const C = {
   // Background
-  background: '#161616',
+  background: '#0b0b0d',
   // Layers
-  layer01: '#262626',
-  layer02: '#393939',
+  layer01: '#161619',
+  layer02: '#1f1f24',
+  layerHi: '#26262c',
   // Text
-  textPrimary: '#F4F4F4',
-  textSecondary: '#8D8D8D',
-  textHelper: '#6F6F6F',
+  textPrimary: '#f6f6f8',
+  textSecondary: '#a0a0aa',
+  textHelper: '#6b6b75',
   textDisabled: '#525252',
   textOnColor: '#FFFFFF',
-  textPlaceholder: '#6F6F6F',
+  textPlaceholder: '#6b6b75',
   // Icon
-  iconPrimary: '#F4F4F4',
-  iconSecondary: '#8D8D8D',
+  iconPrimary: '#f6f6f8',
+  iconSecondary: '#a0a0aa',
   iconDisabled: '#525252',
   // Border
-  borderSubtle01: '#525252',
-  borderStrong01: '#6F6F6F',
-  // Interactive
-  interactive: '#0F62FE',
+  borderSubtle01: 'rgba(255,255,255,0.07)',
+  borderSubtle02: 'rgba(255,255,255,0.13)',
+  borderStrong01: 'rgba(255,255,255,0.20)',
+  // Interactive (Blue)
+  interactive: '#2f6bff',
   focus: '#FFFFFF',
   // Button
-  buttonPrimary: '#0F62FE',
-  buttonPrimaryActive: '#0353E9',
-  buttonSecondary: '#393939',
-  buttonDisabled: '#262626',
+  buttonPrimary: '#2f6bff',
+  buttonPrimaryActive: '#1f53e0',
+  buttonSecondary: '#1f1f24',
+  buttonDisabled: '#1f1f24',
   // Support
-  supportError: '#DA1E28',
-  supportErrorBg: 'rgba(218,30,40,0.18)',
-  supportErrorBorder: 'rgba(218,30,40,0.3)',
-  supportWarning: '#F1C21B',
-  supportSuccess: '#24A148',
-  supportSuccessBg: 'rgba(36,161,72,0.1)',
-  supportSuccessBorder: '#24A148',
-  supportInfo: '#0043CE',
-  // Interactive overlays (for cards/highlights)
-  interactiveBg: 'rgba(15,98,254,0.18)',
-  interactiveBorder: 'rgba(15,98,254,0.22)',
-  interactiveHighlight: 'rgba(15,98,254,0.12)',
+  supportError: '#ff5a6a',
+  supportErrorBg: 'rgba(255,90,106,0.13)',
+  supportErrorBorder: 'rgba(255,90,106,0.3)',
+  supportWarning: '#f0a93b',
+  supportSuccess: '#34d27b',
+  supportSuccessBg: 'rgba(52,210,123,0.14)',
+  supportSuccessBorder: 'rgba(52,210,123,0.22)',
+  supportInfo: '#2f6bff',
+  // Interactive overlays
+  interactiveBg: 'rgba(47,107,255,0.16)',
+  interactiveBorder: 'rgba(47,107,255,0.22)',
+  interactiveHighlight: 'rgba(47,107,255,0.12)',
 } as const;
 
 // Carbon spacing scale (4px base)
@@ -64,7 +66,7 @@ export const F = {
   bold: 'IBMPlexSans_700Bold',
 } as const;
 
-// Carbon productive type scale (px)
+// Type scale (px)
 export const TS = {
   label01: 12,
   body01: 14,

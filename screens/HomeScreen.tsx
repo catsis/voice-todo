@@ -88,16 +88,14 @@ export default function HomeScreen({ apiKey, onOpenSettings }: Props) {
     setSelectedTask(updatedTask);
   }
 
-  const filters = [
-    { key: 'all', label: '全部', count: tasks.filter((t) => !t.completed).length },
-    ...Array.from(new Set(tasks.filter((t) => !t.completed).map((t) => t.category)))
-      .map((cat) => ({
-        key: cat,
-        label: cat,
-        count: tasks.filter((t) => t.category === cat && !t.completed).length,
-      })),
-    { key: 'done', label: '✓', count: tasks.filter((t) => t.completed).length },
-  ];
+  const categoryFilters = Array.from(
+    new Set(tasks.filter((t) => !t.completed).map((t) => t.category))
+  ).map((cat) => ({
+    key: cat,
+    label: cat,
+    count: tasks.filter((t) => t.category === cat && !t.completed).length,
+  }));
+  const doneCount = tasks.filter((t) => t.completed).length;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -120,28 +118,46 @@ export default function HomeScreen({ apiKey, onOpenSettings }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* Filter bar */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterBar}
-          contentContainerStyle={styles.filterBarContent}
-        >
-          {filters.map((f) => {
-            const isActive = filter === f.key;
-            return (
+        {/* Filter bar: "全部" pinned left, rest scrollable */}
+        <View style={styles.filterBar}>
+          <TouchableOpacity
+            onPress={() => setFilter('all')}
+            style={[styles.chipAll, filter !== 'all' && styles.chipAllDim]}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.chipAllText}>全部</Text>
+            {pendingCount > 0 && <Text style={styles.chipCount}>{pendingCount}</Text>}
+          </TouchableOpacity>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.filterScroll}
+            contentContainerStyle={styles.filterScrollContent}
+          >
+            {categoryFilters.map((f) => (
               <TouchableOpacity
                 key={f.key}
                 onPress={() => setFilter(f.key)}
-                style={[styles.filterChip, isActive && styles.filterChipActive]}
+                style={[styles.chip, filter === f.key && styles.chipActive]}
+                activeOpacity={0.8}
               >
-                <Text style={[styles.filterText, isActive && styles.filterTextActive]}>
-                  {f.label}{f.count > 0 ? `  ${f.count}` : ''}
+                <Text style={[styles.chipText, filter === f.key && styles.chipTextActive]}>
+                  {f.label}
                 </Text>
+                {f.count > 0 && <Text style={styles.chipCount}>{f.count}</Text>}
               </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+            ))}
+            <TouchableOpacity
+              onPress={() => setFilter('done')}
+              style={[styles.chipDone, filter !== 'done' && styles.chipDoneDim]}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.chipDoneText}>完成</Text>
+              {doneCount > 0 && <Text style={styles.chipDoneCount}>{doneCount}</Text>}
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
 
         {/* Task list */}
         <FlatList
@@ -244,8 +260,8 @@ const styles = StyleSheet.create({
   },
   badge: {
     backgroundColor: C.interactive,
-    borderRadius: 12,
-    minWidth: 26,
+    borderRadius: 13,
+    minWidth: 30,
     height: 26,
     paddingHorizontal: S.s03,
     justifyContent: 'center',
@@ -253,7 +269,7 @@ const styles = StyleSheet.create({
     marginBottom: S.s01,
   },
   badgeText: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: F.bold,
     color: C.textOnColor,
   },
@@ -265,32 +281,65 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: C.textSecondary,
   },
-  filterBar: { flexGrow: 0 },
-  filterBarContent: {
-    paddingHorizontal: S.s06,
+  filterBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: S.s06,
     paddingBottom: S.s05,
     gap: S.s03,
   },
-  filterChip: {
-    paddingHorizontal: S.s04,
-    paddingVertical: S.s02,
-    borderRadius: 16,
+  filterScroll: { flex: 1 },
+  filterScrollContent: {
+    paddingRight: S.s06,
+    gap: S.s03,
+    alignItems: 'center',
+  },
+  // "全部" pinned chip (always blue)
+  chipAll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: S.s02,
+    height: 40,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: C.interactive,
+    flexShrink: 0,
+  },
+  chipAllDim: { opacity: 0.46 },
+  chipAllText: { fontSize: 15, fontFamily: F.semiBold, color: '#fff' },
+  // Category chips
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: S.s02,
+    height: 40,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: C.layer02,
     borderWidth: 1,
     borderColor: C.borderSubtle01,
   },
-  filterChipActive: {
-    backgroundColor: C.interactive,
-    borderColor: C.interactive,
+  chipActive: {
+    backgroundColor: C.layerHi,
+    borderColor: C.borderSubtle02,
   },
-  filterText: {
-    fontSize: 13,
-    color: C.textSecondary,
-    fontFamily: F.regular,
+  chipText: { fontSize: 15, fontFamily: F.semiBold, color: C.textSecondary },
+  chipTextActive: { color: C.textPrimary },
+  // Count badge on chips
+  chipCount: { fontSize: 13, fontFamily: F.bold, color: 'rgba(255,255,255,0.6)' },
+  // "完成" chip (always green)
+  chipDone: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: S.s02,
+    height: 40,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: C.supportSuccess,
   },
-  filterTextActive: {
-    color: C.textOnColor,
-    fontFamily: F.semiBold,
-  },
+  chipDoneDim: { opacity: 0.46 },
+  chipDoneText: { fontSize: 15, fontFamily: F.semiBold, color: '#06160d' },
+  chipDoneCount: { fontSize: 13, fontFamily: F.bold, color: 'rgba(6,22,13,0.7)' },
   listContent: {
     paddingTop: S.s02,
     paddingBottom: 130,
@@ -303,17 +352,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   fab: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 74,
+    height: 74,
+    borderRadius: 37,
     backgroundColor: C.buttonPrimary,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: C.buttonPrimary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7,
-    shadowRadius: 20,
-    elevation: 12,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.6,
+    shadowRadius: 24,
+    elevation: 14,
   },
   emptyContainer: {
     paddingTop: 100,
