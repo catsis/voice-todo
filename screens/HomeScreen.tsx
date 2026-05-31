@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Task } from '../types/task';
@@ -38,6 +39,23 @@ export default function HomeScreen({ apiKey, onOpenSettings }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const today = getTodayLabel();
+
+  // Toast
+  const [toastMsg, setToastMsg] = useState('');
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+  const toastAnim = useRef<Animated.CompositeAnimation | null>(null);
+
+  function showToast(msg: string) {
+    setToastMsg(msg);
+    toastAnim.current?.stop();
+    toastOpacity.setValue(0);
+    toastAnim.current = Animated.sequence([
+      Animated.timing(toastOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+      Animated.delay(1400),
+      Animated.timing(toastOpacity, { toValue: 0, duration: 280, useNativeDriver: true }),
+    ]);
+    toastAnim.current.start();
+  }
 
   useEffect(() => { loadAllTasks(); }, []);
 
@@ -169,6 +187,7 @@ export default function HomeScreen({ apiKey, onOpenSettings }: Props) {
               onToggle={handleToggle}
               onDelete={handleDelete}
               onPress={setSelectedTask}
+              onToast={showToast}
             />
           )}
           ListEmptyComponent={<EmptyState filter={filter} />}
@@ -193,6 +212,14 @@ export default function HomeScreen({ apiKey, onOpenSettings }: Props) {
             <MicIcon size={26} color={C.textOnColor} />
           </TouchableOpacity>
         </View>
+
+        {/* Toast */}
+        <Animated.View
+          style={[styles.toast, { opacity: toastOpacity }]}
+          pointerEvents="none"
+        >
+          <Text style={styles.toastText}>{toastMsg}</Text>
+        </Animated.View>
 
         <VoiceModal
           visible={modalVisible}
@@ -294,7 +321,6 @@ const styles = StyleSheet.create({
     gap: S.s03,
     alignItems: 'center',
   },
-  // "全部" pinned chip (always blue)
   chipAll: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -307,7 +333,6 @@ const styles = StyleSheet.create({
   },
   chipAllDim: { opacity: 0.46 },
   chipAllText: { fontSize: 15, fontFamily: F.semiBold, color: '#fff' },
-  // Category chips
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -325,9 +350,7 @@ const styles = StyleSheet.create({
   },
   chipText: { fontSize: 15, fontFamily: F.semiBold, color: C.textSecondary },
   chipTextActive: { color: C.textPrimary },
-  // Count badge on chips
   chipCount: { fontSize: 13, fontFamily: F.bold, color: 'rgba(255,255,255,0.6)' },
-  // "完成" chip (always green)
   chipDone: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -363,6 +386,28 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 24,
     elevation: 14,
+  },
+  toast: {
+    position: 'absolute',
+    alignSelf: 'center',
+    bottom: 128,
+    backgroundColor: C.layerHi,
+    borderWidth: 1,
+    borderColor: C.borderSubtle02,
+    borderRadius: 14,
+    paddingVertical: 11,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  toastText: {
+    fontSize: 14,
+    color: C.textPrimary,
+    fontFamily: F.semiBold,
+    letterSpacing: 0.3,
   },
   emptyContainer: {
     paddingTop: 100,

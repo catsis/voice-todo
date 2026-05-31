@@ -1,114 +1,212 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Animated,
+  PanResponder,
 } from 'react-native';
 import { Task } from '../types/task';
 import { CategoryBadge, PriorityBadge } from './TagBadge';
 import { C, S, F } from '../lib/theme';
+
+const THRESHOLD = 88;
 
 interface Props {
   task: Task;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onPress: (task: Task) => void;
+  onToast?: (msg: string) => void;
 }
 
-export default function TaskCard({ task, onToggle, onDelete, onPress }: Props) {
-  const opacity = React.useRef(new Animated.Value(task.completed ? 0.55 : 1)).current;
+export default function TaskCard({ task, onToggle, onDelete, onPress, onToast }: Props) {
+  // Keep latest props accessible inside stable PanResponder callbacks
+  const taskRef = useRef(task);
+  taskRef.current = task;
+  const cbRef = useRef({ onToggle, onDelete, onPress, onToast });
+  cbRef.current = { onToggle, onDelete, onPress, onToast };
 
-  React.useEffect(() => {
-    Animated.timing(opacity, {
-      toValue: task.completed ? 0.55 : 1,
-      duration: 280,
+  const translateX = useRef(new Animated.Value(0)).current;
+  const rowOpacity = useRef(new Animated.Value(1)).current;
+
+  function flyOff(dir: 'left' | 'right', callback: () => void) {
+    Animated.parallel([
+      Animated.timing(translateX, {
+        toValue: dir === 'right' ? 600 : -600,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+      Animated.timing(rowOpacity, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+    ]).start(() => callback());
+  }
+
+  function snapBack() {
+    Animated.spring(translateX, {
+      toValue: 0,
       useNativeDriver: true,
+      tension: 70,
+      friction: 10,
     }).start();
-  }, [task.completed]);
+  }
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dx) > Math.abs(g.dy) + 4 && Math.abs(g.dx) > 8,
+      onMoveShouldSetPanResponderCapture: (_, g) =>
+        Math.abs(g.dx) > Math.abs(g.dy) + 4 && Math.abs(g.dx) > 8,
+      onPanResponderMove: (_, g) => {
+        // Rubber-band effect past threshold
+        let val = g.dx;
+        if (Math.abs(val) > THRESHOLD) {
+          val = (val > 0 ? 1 : -1) * (THRESHOLD + (Math.abs(val) - THRESHOLD) * 0.4);
+        }
+        translateX.setValue(val);
+      },
+      onPanResponderRelease: (_, g) => {
+        const { onToggle, onDelete, onToast } = cbRef.current;
+        const t = taskRef.current;
+
+        if (g.dx > THRESHOLD - 4) {
+          // Right swipe → toggle complete/undone
+          onToast?.(t.completed ? '已恢復待辦' : '已完成');
+          flyOff('right', () => {
+            onToggle(t.id);
+            translateX.setValue(0);
+            rowOpacity.setValue(1);
+          });
+        } else if (g.dx < -(THRESHOLD - 4)) {
+          // Left swipe → delete
+          onToast?.('已刪除');
+          flyOff('left', () => onDelete(t.id));
+        } else {
+          snapBack();
+        }
+      },
+      onPanResponderTerminate: () => snapBack(),
+    })
+  ).current;
+
+  // Reveal action backgrounds based on swipe direction
+  const leftBgOpacity = translateX.interpolate({
+    inputRange: [0, THRESHOLD],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+  const rightBgOpacity = translateX.interpolate({
+    inputRange: [-THRESHOLD, 0],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
 
   return (
-    <Animated.View
-      style={[
-        styles.card,
-        task.completed && styles.cardDone,
-        task.priority === 'urgent' && !task.completed && styles.cardUrgent,
-        { opacity },
-      ]}
-    >
-      <TouchableOpacity
-        onPress={() => onPress(task)}
-        activeOpacity={0.75}
-        style={styles.cardBody}
-      >
-        {/* Top row: badges + actions */}
-        <View style={styles.cardTop}>
-          <View style={styles.badges}>
-            <CategoryBadge category={task.category} />
-            <PriorityBadge priority={task.priority} />
-          </View>
-          <View style={styles.actions}>
-            {task.completed ? (
-              <TouchableOpacity
-                onPress={() => onToggle(task.id)}
-                style={styles.undoBtn}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={styles.undoBtnText}>↺</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                onPress={() => onToggle(task.id)}
-                style={styles.checkBtn}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={styles.checkIcon}>○</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              onPress={() => onDelete(task.id)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={styles.deleteBtn}
-            >
-              <Text style={styles.deleteIcon}>✕</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+    <Animated.View style={[styles.outer, { opacity: rowOpacity }]}>
+      <View style={styles.inner}>
+        {/* Complete / restore action (right swipe reveals) */}
+        <Animated.View style={[StyleSheet.absoluteFill, styles.actionLeft, { opacity: leftBgOpacity }]}>
+          <Text style={styles.actionIcon}>{task.completed ? '↺' : '✓'}</Text>
+          <Text style={styles.actionText}>{task.completed ? '待辦' : '完成'}</Text>
+        </Animated.View>
 
-        {/* Title */}
-        <Text
-          style={[styles.targetText, task.completed && styles.targetDone]}
-          numberOfLines={2}
+        {/* Delete action (left swipe reveals) */}
+        <Animated.View style={[StyleSheet.absoluteFill, styles.actionRight, { opacity: rightBgOpacity }]}>
+          <Text style={styles.actionText}>刪除</Text>
+          <Text style={styles.actionIcon}>✕</Text>
+        </Animated.View>
+
+        {/* Card — translates on swipe */}
+        <Animated.View
+          style={[
+            styles.card,
+            task.completed && styles.cardDone,
+            task.priority === 'urgent' && !task.completed && styles.cardUrgent,
+            { transform: [{ translateX }] },
+          ]}
+          {...panResponder.panHandlers}
         >
-          {task.target}
-        </Text>
+          <TouchableOpacity
+            onPress={() => cbRef.current.onPress(taskRef.current)}
+            activeOpacity={0.75}
+            style={styles.cardBody}
+          >
+            <View style={styles.badges}>
+              <CategoryBadge category={task.category} />
+              <PriorityBadge priority={task.priority} />
+            </View>
 
-        {/* Time (hidden when done) */}
-        {task.time && !task.completed ? (
-          <Text style={styles.timeText}>◷  {task.time}</Text>
-        ) : null}
+            <Text
+              style={[styles.targetText, task.completed && styles.targetDone]}
+              numberOfLines={2}
+            >
+              {task.target}
+            </Text>
 
-        {/* Done label */}
-        {task.completed && (
-          <View style={styles.doneLabel}>
-            <Text style={styles.doneLabelText}>✓ 已完成</Text>
-          </View>
-        )}
-      </TouchableOpacity>
+            {task.time && !task.completed ? (
+              <Text style={styles.timeText}>◷  {task.time}</Text>
+            ) : null}
+
+            {task.completed && (
+              <View style={styles.doneLabel}>
+                <Text style={styles.doneLabelText}>✓ 已完成</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  outer: {
+    marginHorizontal: S.s05,
+    marginVertical: 6,
+  },
+  inner: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  // Action backgrounds
+  actionLeft: {
+    backgroundColor: C.supportSuccess,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 26,
+    gap: 10,
+  },
+  actionRight: {
+    backgroundColor: C.supportError,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingRight: 26,
+    gap: 10,
+  },
+  actionIcon: {
+    fontSize: 20,
+    color: '#fff',
+    fontWeight: '700',
+  },
+  actionText: {
+    fontSize: 17,
+    color: '#fff',
+    fontFamily: F.bold,
+    letterSpacing: 0.5,
+  },
+  // Card
   card: {
     backgroundColor: C.layer01,
     borderRadius: 20,
-    marginHorizontal: S.s05,
-    marginVertical: 6,
     borderWidth: 1,
     borderColor: C.borderSubtle01,
-    overflow: 'hidden',
   },
   cardDone: {
     backgroundColor: '#111a14',
@@ -122,58 +220,11 @@ const styles = StyleSheet.create({
     padding: S.s05,
     gap: S.s03,
   },
-  cardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: S.s03,
-  },
   badges: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
     gap: S.s02,
-    flex: 1,
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: S.s04,
-    flexShrink: 0,
-    paddingTop: 2,
-  },
-  checkBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 1.5,
-    borderColor: C.borderSubtle02,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkIcon: {
-    fontSize: 10,
-    color: C.borderSubtle02,
-  },
-  undoBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: C.supportSuccessBorder,
-    backgroundColor: C.supportSuccessBg,
-  },
-  undoBtnText: {
-    fontSize: 12,
-    color: C.supportSuccess,
-    fontFamily: F.semiBold,
-  },
-  deleteBtn: {
-    padding: S.s01,
-  },
-  deleteIcon: {
-    fontSize: 12,
-    color: C.iconDisabled,
   },
   targetText: {
     fontSize: 20,
