@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   useFonts,
   IBMPlexSans_400Regular,
@@ -38,7 +39,7 @@ export default function App() {
   }
 
   return (
-    <>
+    <SafeAreaProvider>
       <StatusBar style="light" backgroundColor={C.background} />
       {screen === 'home' ? (
         <HomeScreen
@@ -48,6 +49,6 @@ export default function App() {
       ) : (
         <SettingsScreen onBack={handleBackFromSettings} />
       )}
-    </>
+    </SafeAreaProvider>
   );
 }

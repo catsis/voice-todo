@@ -15,7 +15,6 @@ import {
   KeyboardAvoidingView,
   Dimensions,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
@@ -145,7 +144,6 @@ function StopIcon({ size = 20, color = '#FFFFFF' }: { size?: number; color?: str
 
 // ── 主元件 ────────────────────────────────────────────────────
 export default function VoiceModal({ visible, apiKey, onClose, onAdd }: Props) {
-  const insets = useSafeAreaInsets();
   const [stage, setStage] = useState<Stage>('idle');
   const [transcript, setTranscript] = useState('');
   const [rawInput, setRawInput] = useState('');
@@ -285,7 +283,7 @@ export default function VoiceModal({ visible, apiKey, onClose, onAdd }: Props) {
 
   const canAdd = stage === 'result' && editTarget.trim().length > 0;
   const isResultStage = stage === 'result';
-  const bottomPad = Math.max(insets.bottom, S.s05);
+  const bottomPad = Platform.OS === 'ios' ? 34 : S.s06;
 
   return (
     <Modal
