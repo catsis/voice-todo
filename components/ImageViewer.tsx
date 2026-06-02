@@ -1,10 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Animated, Dimensions, StyleSheet,
-  BackHandler, PanResponder, TouchableOpacity,
+  BackHandler, TouchableOpacity,
 } from 'react-native';
 
 const { width: W, height: H } = Dimensions.get('window');
+const SWIPE_THRESHOLD = W * 0.28;
+const SLIDE_MS = 220;
+const RUBBER = 0.25;
 
 interface Props {
   images: string[];
@@ -12,88 +15,207 @@ interface Props {
   onClose: () => void;
 }
 
-function dist2(a: any, b: any) {
-  return Math.sqrt((a.pageX - b.pageX) ** 2 + (a.pageY - b.pageY) ** 2);
+function pinchDist(t0: any, t1: any) {
+  return Math.hypot(t0.pageX - t1.pageX, t0.pageY - t1.pageY);
 }
 
 export default function ImageViewer({ images, initialIndex, onClose }: Props) {
   const isOpen = initialIndex >= 0 && initialIndex < images.length;
 
-  const [visible, setVisible]           = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [visible, setVisible] = useState(false);
+  const [idx, setIdx]         = useState(0);
 
-  // Animations
+  // Open / close
   const backdropOp = useRef(new Animated.Value(0)).current;
   const contentSc  = useRef(new Animated.Value(0.88)).current;
-  const imgOp      = useRef(new Animated.Value(1)).current;
-  const imgSc      = useRef(new Animated.Value(1)).current;
-  const imgTX      = useRef(new Animated.Value(0)).current;
-  const imgTY      = useRef(new Animated.Value(0)).current;
 
-  // Mutable zoom state (no re-renders)
-  const curSc    = useRef(1);
-  const saveTX   = useRef(0);
-  const saveTY   = useRef(0);
-  const pinching = useRef(false);
-  const pin0dist = useRef(0);
-  const pin0sc   = useRef(1);
-  const wasOpen  = useRef(false);
+  // Slide — three absolute X positions (prev / cur / next)
+  const txPrev = useRef(new Animated.Value(-W)).current;
+  const txCur  = useRef(new Animated.Value(0)).current;
+  const txNext = useRef(new Animated.Value(W)).current;
 
-  // Stable refs
+  // Zoom (applied to current image only)
+  const zoomSc = useRef(new Animated.Value(1)).current;
+  const zoomTX = useRef(new Animated.Value(0)).current;
+  const zoomTY = useRef(new Animated.Value(0)).current;
+
+  // Mutable refs
   const idxRef     = useRef(0);
   const imgsRef    = useRef(images);
   const onCloseRef = useRef(onClose);
-  useEffect(() => { idxRef.current = currentIndex; }, [currentIndex]);
-  useEffect(() => { imgsRef.current = images; },     [images]);
+  const curScale   = useRef(1);
+  const savedTX    = useRef(0);
+  const savedTY    = useRef(0);
+
+  // Gesture tracking
+  const grantX    = useRef(0);
+  const grantY    = useRef(0);
+  const pinching  = useRef(false);
+  const initPinch = useRef(0);
+  const initScale = useRef(1);
+  const sliding   = useRef(false);
+  const animating = useRef(false);
+
+  useEffect(() => { idxRef.current = idx; }, [idx]);
+  useEffect(() => { imgsRef.current = images; }, [images]);
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
-  // ── Zoom ────────────────────────────────────────────────────────
-  function resetZoom(anim = false) {
-    curSc.current = 1; saveTX.current = 0; saveTY.current = 0;
-    if (anim) {
+  // ── Zoom ─────────────────────────────────────────────────────────
+  function resetZoom(animated = false) {
+    curScale.current = 1; savedTX.current = 0; savedTY.current = 0;
+    if (animated) {
       Animated.parallel([
-        Animated.spring(imgSc, { toValue: 1, useNativeDriver: true }),
-        Animated.spring(imgTX, { toValue: 0, useNativeDriver: true }),
-        Animated.spring(imgTY, { toValue: 0, useNativeDriver: true }),
+        Animated.spring(zoomSc, { toValue: 1, useNativeDriver: true }),
+        Animated.spring(zoomTX, { toValue: 0, useNativeDriver: true }),
+        Animated.spring(zoomTY, { toValue: 0, useNativeDriver: true }),
       ]).start();
     } else {
-      imgSc.setValue(1); imgTX.setValue(0); imgTY.setValue(0);
+      zoomSc.setValue(1); zoomTX.setValue(0); zoomTY.setValue(0);
     }
   }
 
-  // ── Image switch ────────────────────────────────────────────────
-  const switchToRef = useRef<(idx: number) => void>(() => {});
-  function switchTo(idx: number) {
-    if (idx < 0 || idx >= imgsRef.current.length) return;
-    resetZoom();
-    imgOp.setValue(0);
-    setCurrentIndex(idx);
-    idxRef.current = idx;
-    // setTimeout gives React one frame to update image source before fade-in
-    setTimeout(() => {
-      Animated.timing(imgOp, { toValue: 1, duration: 160, useNativeDriver: true }).start();
-    }, 16);
+  // ── Slide ─────────────────────────────────────────────────────────
+  function springBack() {
+    Animated.parallel([
+      Animated.spring(txPrev, { toValue: -W, useNativeDriver: true, tension: 130, friction: 15 }),
+      Animated.spring(txCur,  { toValue: 0,  useNativeDriver: true, tension: 130, friction: 15 }),
+      Animated.spring(txNext, { toValue: W,  useNativeDriver: true, tension: 130, friction: 15 }),
+    ]).start(() => { animating.current = false; });
   }
-  useEffect(() => { switchToRef.current = switchTo; });
 
-  // ── Open/close — isOpen effect is the ONLY place that drives animation ──
-  // User actions just call onClose() — never run animation themselves.
-  // This prevents the double-close loop (doClose → onClose → isOpen=false → doClose again).
+  // direction: -1 = go to next (slide left), +1 = go to prev (slide right)
+  function commitSlide(direction: 1 | -1) {
+    const newIdx = idxRef.current - direction;
+    if (newIdx < 0 || newIdx >= imgsRef.current.length) { springBack(); return; }
+
+    const target = direction * W;
+    Animated.parallel([
+      Animated.timing(txPrev, { toValue: -W + target, duration: SLIDE_MS, useNativeDriver: true }),
+      Animated.timing(txCur,  { toValue: target,       duration: SLIDE_MS, useNativeDriver: true }),
+      Animated.timing(txNext, { toValue: W + target,   duration: SLIDE_MS, useNativeDriver: true }),
+    ]).start(() => {
+      txPrev.setValue(-W); txCur.setValue(0); txNext.setValue(W);
+      resetZoom();
+      idxRef.current = newIdx;
+      setIdx(newIdx);
+      animating.current = false;
+    });
+  }
+
+  // ── Responder handlers ────────────────────────────────────────────
+  const handleGrant = (e: any) => {
+    if (animating.current) return;
+    const t = e.nativeEvent.touches;
+    pinching.current = false; sliding.current = false;
+
+    if (t.length >= 2) {
+      pinching.current  = true;
+      initPinch.current = pinchDist(t[0], t[1]);
+      initScale.current = curScale.current;
+    } else {
+      const touch = t[0] ?? e.nativeEvent;
+      grantX.current = touch.pageX;
+      grantY.current = touch.pageY;
+    }
+  };
+
+  const handleMove = (e: any) => {
+    if (animating.current) return;
+    const t = e.nativeEvent.touches;
+
+    if (t.length >= 2) {
+      if (!pinching.current) {
+        pinching.current  = true;
+        initPinch.current = pinchDist(t[0], t[1]);
+        initScale.current = curScale.current;
+      }
+      const newSc = Math.max(1, Math.min(4,
+        initScale.current * pinchDist(t[0], t[1]) / initPinch.current));
+      zoomSc.setValue(newSc);
+      curScale.current = newSc;
+      return;
+    }
+
+    if (pinching.current) return;
+
+    const touch = t[0] ?? e.nativeEvent;
+    const dx = touch.pageX - grantX.current;
+    const dy = touch.pageY - grantY.current;
+
+    if (curScale.current > 1) {
+      zoomTX.setValue(savedTX.current + dx);
+      zoomTY.setValue(savedTY.current + dy);
+      return;
+    }
+
+    // Start sliding only if movement is predominantly horizontal
+    if (!sliding.current) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      sliding.current = Math.abs(dx) > Math.abs(dy);
+    }
+    if (!sliding.current) return;
+
+    const canGoPrev = idxRef.current > 0;
+    const canGoNext = idxRef.current < imgsRef.current.length - 1;
+    let eff = dx;
+    if (dx > 0 && !canGoPrev) eff = dx * RUBBER;
+    if (dx < 0 && !canGoNext) eff = dx * RUBBER;
+
+    txPrev.setValue(-W + eff);
+    txCur.setValue(eff);
+    txNext.setValue(W + eff);
+  };
+
+  const handleRelease = (e: any) => {
+    if (animating.current) return;
+
+    if (pinching.current) {
+      pinching.current = false;
+      if (curScale.current < 1.05) resetZoom(true);
+      return;
+    }
+
+    const touch = (e.nativeEvent.changedTouches ?? [])[0] ?? e.nativeEvent;
+    const dx = touch.pageX - grantX.current;
+    const dy = touch.pageY - grantY.current;
+
+    if (curScale.current > 1) {
+      savedTX.current += dx;
+      savedTY.current += dy;
+      return;
+    }
+
+    if (sliding.current) {
+      sliding.current   = false;
+      animating.current = true;
+      if      (dx < -SWIPE_THRESHOLD) commitSlide(-1);
+      else if (dx >  SWIPE_THRESHOLD) commitSlide(1);
+      else                            springBack();
+      return;
+    }
+
+    if (Math.abs(dx) < 12 && Math.abs(dy) < 12) onCloseRef.current();
+  };
+
+  const handleTerminate = () => {
+    pinching.current = false; sliding.current = false;
+    if (animating.current) return;
+    springBack();
+  };
+
+  // ── Open / close ──────────────────────────────────────────────────
+  const wasOpen     = useRef(false);
+  const prevVisible = useRef(false);
+
   useEffect(() => {
     if (isOpen) {
-      setCurrentIndex(initialIndex);
-      idxRef.current = initialIndex;
       resetZoom();
-      imgOp.setValue(1);
-      if (!wasOpen.current) {
-        wasOpen.current = true;
-        setVisible(true); // open anim fires in prevVisible effect below
-      } else {
-        switchToRef.current(initialIndex); // already open, just switch
-      }
+      txPrev.setValue(-W); txCur.setValue(0); txNext.setValue(W);
+      idxRef.current = initialIndex;
+      setIdx(initialIndex);
+      if (!wasOpen.current) { wasOpen.current = true; setVisible(true); }
     } else if (wasOpen.current) {
       wasOpen.current = false;
-      // Close animation — we do NOT call onClose here (parent already called it)
       Animated.parallel([
         Animated.timing(contentSc,  { toValue: 0.88, duration: 180, useNativeDriver: true }),
         Animated.timing(backdropOp, { toValue: 0,    duration: 180, useNativeDriver: true }),
@@ -101,12 +223,9 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
     }
   }, [isOpen, initialIndex]);
 
-  // Open animation — fires once when visible transitions false→true
-  const prevVisible = useRef(false);
   useEffect(() => {
     if (visible && !prevVisible.current) {
-      contentSc.setValue(0.88);
-      backdropOp.setValue(0);
+      contentSc.setValue(0.88); backdropOp.setValue(0);
       Animated.parallel([
         Animated.spring(contentSc,  { toValue: 1, useNativeDriver: true, tension: 90, friction: 11 }),
         Animated.timing(backdropOp, { toValue: 1, duration: 200, useNativeDriver: true }),
@@ -115,97 +234,61 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
     prevVisible.current = visible;
   }, [visible]);
 
-  // ── Android back button — calls onClose (parent drives close) ──
   useEffect(() => {
     if (!visible) return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      onCloseRef.current();
-      return true;
+      onCloseRef.current(); return true;
     });
     return () => sub.remove();
   }, [visible]);
 
-  // ── PanResponder ─────────────────────────────────────────────────
-  // Fix: onStartShouldSetPanResponder always returns true so the gesture
-  // layer reliably claims single-finger touches. The close button
-  // (inside a separate sibling subtree via pointerEvents=box-none)
-  // is unaffected — it claims via the normal responder bubble.
-  const pr = useRef(PanResponder.create({
-    onStartShouldSetPanResponder:        () => true,
-    onStartShouldSetPanResponderCapture: () => false,
-    onMoveShouldSetPanResponder:         () => true,
-    onMoveShouldSetPanResponderCapture:  () => false,
-
-    onPanResponderGrant: (e) => {
-      const t = e.nativeEvent.touches;
-      if (t.length >= 2) {
-        pinching.current = true;
-        pin0dist.current = dist2(t[0], t[1]);
-        pin0sc.current   = curSc.current;
-      } else {
-        pinching.current = false;
-      }
-    },
-
-    onPanResponderMove: (e, g) => {
-      const t = e.nativeEvent.touches;
-      if (t.length >= 2) {
-        // Transition 1-finger → 2-finger mid-gesture
-        if (!pinching.current) {
-          pinching.current = true;
-          pin0dist.current = dist2(t[0], t[1]);
-          pin0sc.current   = curSc.current;
-        }
-        const d = dist2(t[0], t[1]);
-        const newSc = Math.max(1, Math.min(4, pin0sc.current * d / pin0dist.current));
-        imgSc.setValue(newSc);
-        curSc.current = newSc;
-      } else if (curSc.current > 1 && !pinching.current) {
-        imgTX.setValue(saveTX.current + g.dx);
-        imgTY.setValue(saveTY.current + g.dy);
-      }
-    },
-
-    onPanResponderRelease: (_, g) => {
-      if (pinching.current) {
-        pinching.current = false;
-        if (curSc.current < 1.05) resetZoom(true);
-      } else if (curSc.current > 1) {
-        saveTX.current += g.dx;
-        saveTY.current += g.dy;
-      } else {
-        const ax = Math.abs(g.dx), ay = Math.abs(g.dy);
-        if (ax > 50 && ax > ay * 1.5) {
-          switchToRef.current(idxRef.current + (g.dx < 0 ? 1 : -1));
-        } else if (ax < 10 && ay < 10) {
-          onCloseRef.current(); // tap anywhere → close
-        }
-      }
-    },
-
-    onPanResponderTerminate: () => { pinching.current = false; },
-  })).current;
-
   if (!visible || images.length === 0) return null;
 
-  const uri = images[currentIndex] ?? images[0];
-  const n   = images.length;
+  const n       = images.length;
+  const prevUri = idx > 0     ? images[idx - 1] : null;
+  const curUri  = images[idx] ?? images[0];
+  const nextUri = idx < n - 1 ? images[idx + 1] : null;
 
   return (
     <Animated.View style={[StyleSheet.absoluteFill, s.wrap, { opacity: backdropOp }]}>
-      {/* Gesture layer */}
       <Animated.View
         style={[StyleSheet.absoluteFill, { transform: [{ scale: contentSc }] }]}
-        {...pr.panHandlers}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        onResponderGrant={handleGrant}
+        onResponderMove={handleMove}
+        onResponderRelease={handleRelease}
+        onResponderTerminate={handleTerminate}
       >
+        {prevUri && (
+          <Animated.Image
+            source={{ uri: prevUri }}
+            style={[s.img, { transform: [{ translateX: txPrev }] }]}
+            resizeMode="contain"
+          />
+        )}
+
+        {/* Current image: slide offset + zoom pan + zoom scale */}
         <Animated.Image
-          source={{ uri }}
+          source={{ uri: curUri }}
           style={[s.img, {
-            opacity: imgOp,
-            transform: [{ scale: imgSc }, { translateX: imgTX }, { translateY: imgTY }],
+            transform: [
+              { translateX: txCur },
+              { translateX: zoomTX },
+              { translateY: zoomTY },
+              { scale: zoomSc },
+            ],
           }]}
           resizeMode="contain"
         />
+
+        {nextUri && (
+          <Animated.Image
+            source={{ uri: nextUri }}
+            style={[s.img, { transform: [{ translateX: txNext }] }]}
+            resizeMode="contain"
+          />
+        )}
       </Animated.View>
 
       {/* UI overlay — box-none passes unhandled touches to gesture layer */}
@@ -222,7 +305,7 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
         {n > 1 && (
           <View style={s.dots} pointerEvents="none">
             {Array.from({ length: n }, (_, i) => (
-              <View key={i} style={[s.dot, i === currentIndex && s.dotOn]} />
+              <View key={i} style={[s.dot, i === idx && s.dotOn]} />
             ))}
           </View>
         )}
@@ -233,10 +316,12 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
 
 const s = StyleSheet.create({
   wrap: { backgroundColor: 'rgba(0,0,0,0.93)', zIndex: 999 },
-  img:  {
-    width: W, height: H * 0.84,
-    alignSelf: 'center',
-    marginTop: (H - H * 0.84) / 2,
+  img: {
+    position: 'absolute',
+    width: W,
+    height: H * 0.84,
+    top: (H - H * 0.84) / 2,
+    left: 0,
   },
   closeBtn: {
     position: 'absolute', top: 48, right: 20,

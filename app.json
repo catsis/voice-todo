@@ -2,7 +2,7 @@
   "expo": {
     "name": "語音待辦",
     "slug": "voice-todo",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "owner": "kurumi030",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,6 +16,7 @@
     },
     "android": {
       "package": "com.kurumi030.voicetodo",
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#FFFFFF"
@@ -31,6 +32,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "./plugins/renameApk",
       [
         "expo-speech-recognition",
         {
