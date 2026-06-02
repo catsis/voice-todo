@@ -11,8 +11,10 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Task } from '../types/task';
+import { Task, Priority } from '../types/task';
 import { CategoryBadge, PriorityBadge } from './TagBadge';
+import ImagePickerSection from './ImagePickerSection';
+import ImageViewer from './ImageViewer';
 import { C, S, F, TS } from '../lib/theme';
 
 interface Props {
@@ -119,7 +121,9 @@ export default function TaskDetailModal({ task, visible, onClose, onSave }: Prop
   const [editTarget, setEditTarget] = useState('');
   const [editTime, setEditTime] = useState('');
   const [editNotes, setEditNotes] = useState('');
-  const [isUrgent, setIsUrgent] = useState(false);
+  const [editPriority, setEditPriority] = useState<Priority>('normal');
+  const [editImages, setEditImages]     = useState<string[]>([]);
+  const [viewerIndex, setViewerIndex]   = useState(-1);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [pickerYear, setPickerYear] = useState(todayDate.getFullYear());
   const [pickerMonth, setPickerMonth] = useState(todayDate.getMonth() + 1);
@@ -138,6 +142,7 @@ export default function TaskDetailModal({ task, visible, onClose, onSave }: Prop
     if (!visible) {
       setIsEditing(false);
       setShowDatePicker(false);
+      setViewerIndex(-1);
     }
   }, [visible]);
 
@@ -148,7 +153,8 @@ export default function TaskDetailModal({ task, visible, onClose, onSave }: Prop
     setEditTarget(task!.target);
     setEditTime(task!.time ?? '');
     setEditNotes(task!.notes ?? '');
-    setIsUrgent(task!.priority === 'urgent');
+    setEditPriority(task!.priority);
+    setEditImages(task!.images ?? []);
     if (task!.time) {
       const parts = task!.time.split('/');
       if (parts.length === 3) {
@@ -179,7 +185,8 @@ export default function TaskDetailModal({ task, visible, onClose, onSave }: Prop
       target: editTarget.trim() || task!.target,
       time: editTime || undefined,
       notes: editNotes.trim() || undefined,
-      priority: isUrgent ? 'urgent' : 'normal',
+      images: editImages.length > 0 ? editImages : undefined,
+      priority: editPriority,
       category: editAction.trim() || task!.category,
     };
     onSave(updated);
@@ -295,6 +302,17 @@ export default function TaskDetailModal({ task, visible, onClose, onSave }: Prop
                 </View>
               ) : null}
 
+              {(task.images?.length ?? 0) > 0 && (
+                <View style={styles.fieldCard}>
+                  <Text style={styles.fieldLabel}>照片</Text>
+                  <ImagePickerSection
+                    images={task.images!}
+                    onView={uri => setViewerIndex(task.images!.indexOf(uri))}
+                    editable={false}
+                  />
+                </View>
+              )}
+
               {task.rawText ? (
                 <View style={styles.rawCard}>
                   <Text style={styles.rawLabel}>語音原文</Text>
@@ -366,16 +384,28 @@ export default function TaskDetailModal({ task, visible, onClose, onSave }: Prop
                     multiline
                     textAlignVertical="top"
                   />
+                  <ImagePickerSection
+                    images={editImages}
+                    onChange={setEditImages}
+                    onView={uri => setViewerIndex(editImages.indexOf(uri))}
+                  />
                 </View>
 
-                <TouchableOpacity
-                  style={[styles.urgentToggle, isUrgent && styles.urgentToggleOn]}
-                  onPress={() => setIsUrgent(!isUrgent)}
-                >
-                  <Text style={[styles.urgentToggleText, isUrgent && styles.urgentToggleTextOn]}>
-                    {isUrgent ? '● 緊急' : '○ 一般'}
-                  </Text>
-                </TouchableOpacity>
+                <View style={styles.fieldCard}>
+                  <Text style={styles.fieldLabel}>優先級</Text>
+                  <View style={styles.prioRow}>
+                    {(['normal', 'important', 'urgent'] as Priority[]).map((p) => {
+                      const isOn = editPriority === p;
+                      const label = p === 'normal' ? '一般' : p === 'important' ? '重要' : '緊急';
+                      const onBg = p === 'urgent' ? styles.prioBtnUrgent : p === 'important' ? styles.prioBtnImportant : styles.prioBtnNormalOn;
+                      return (
+                        <TouchableOpacity key={p} style={[styles.prioBtn, isOn && onBg]} onPress={() => setEditPriority(p)} activeOpacity={0.7}>
+                          <Text style={[styles.prioBtnText, isOn && styles.prioBtnTextOn]}>{label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
               </ScrollView>
 
               <View style={styles.saveBtnWrap}>
@@ -392,6 +422,11 @@ export default function TaskDetailModal({ task, visible, onClose, onSave }: Prop
           )}
 
         </KeyboardAvoidingView>
+        <ImageViewer
+          images={isEditing ? editImages : (task.images ?? [])}
+          initialIndex={viewerIndex}
+          onClose={() => setViewerIndex(-1)}
+        />
       </SafeAreaView>
     </Modal>
   );
@@ -467,15 +502,17 @@ const styles = StyleSheet.create({
   notesInput: { minHeight: 56, borderBottomWidth: 0 },
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: S.s03 },
   timeClear: { fontSize: 14, color: C.textHelper, padding: S.s01 },
-  urgentToggle: {
-    backgroundColor: C.layer01, borderRadius: 4, padding: S.s04,
-    alignItems: 'center', borderWidth: 1, borderColor: C.borderSubtle01,
+  prioRow: { flexDirection: 'row', gap: S.s02, marginTop: S.s03 },
+  prioBtn: {
+    flex: 1, height: 40, borderRadius: 10,
+    backgroundColor: C.layer02, borderWidth: 1, borderColor: C.borderSubtle01,
+    alignItems: 'center', justifyContent: 'center',
   },
-  urgentToggleOn: {
-    backgroundColor: C.supportErrorBg, borderColor: C.supportErrorBorder,
-  },
-  urgentToggleText: { fontSize: TS.body01, color: C.textHelper, fontFamily: F.regular },
-  urgentToggleTextOn: { color: C.supportError, fontFamily: F.semiBold },
+  prioBtnText: { fontSize: TS.body01, fontFamily: F.semiBold, color: C.textHelper },
+  prioBtnNormalOn:  { backgroundColor: C.interactive,  borderColor: C.interactive },
+  prioBtnImportant: { backgroundColor: '#f0a93b',       borderColor: '#f0a93b' },
+  prioBtnUrgent:    { backgroundColor: C.supportError,  borderColor: C.supportError },
+  prioBtnTextOn:    { color: '#fff' },
 
   saveBtnWrap: {
     paddingHorizontal: S.s06,

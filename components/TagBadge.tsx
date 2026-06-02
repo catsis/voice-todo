@@ -60,12 +60,21 @@ interface PriorityBadgeProps {
 }
 
 export function PriorityBadge({ priority }: PriorityBadgeProps) {
-  if (priority !== 'urgent') return null;
-  return (
-    <View style={styles.urgentBadge}>
-      <Text style={styles.urgentText}>急</Text>
-    </View>
-  );
+  if (priority === 'urgent') {
+    return (
+      <View style={styles.urgentBadge}>
+        <Text style={styles.urgentText}>急</Text>
+      </View>
+    );
+  }
+  if (priority === 'important') {
+    return (
+      <View style={styles.importantBadge}>
+        <Text style={styles.importantText}>重要</Text>
+      </View>
+    );
+  }
+  return null;
 }
 
 const styles = StyleSheet.create({
@@ -101,5 +110,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: F.semiBold,
     color: C.supportError,
+  },
+  importantBadge: {
+    backgroundColor: 'rgba(240,169,59,0.15)',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: 'rgba(240,169,59,0.35)',
+  },
+  importantText: {
+    fontSize: 12,
+    fontWeight: '600',
+    fontFamily: F.semiBold,
+    color: '#f0a93b',
   },
 });

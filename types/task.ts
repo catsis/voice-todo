@@ -1,6 +1,6 @@
 export type TaskCategory = string;
 
-export type Priority = 'urgent' | 'normal';
+export type Priority = 'urgent' | 'important' | 'normal';
 
 export interface Task {
   id: string;
@@ -9,6 +9,7 @@ export interface Task {
   target: string;
   time?: string;
   notes?: string;
+  images?: string[];
   priority: Priority;
   category: TaskCategory;
   completed: boolean;

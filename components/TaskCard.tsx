@@ -158,6 +158,15 @@ export default function TaskCard({ task, onToggle, onDelete, onPress, onToast }:
                 <Text style={styles.doneLabelText}>✓ 已完成</Text>
               </View>
             )}
+
+            {(task.images?.length ?? 0) > 0 && (
+              <View style={styles.imgBadge}>
+                <View style={styles.imgCam}>
+                  <View style={styles.imgCamLens} />
+                </View>
+                <Text style={styles.imgCount}>{task.images!.length}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -255,5 +264,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: C.supportSuccess,
     fontFamily: F.bold,
+  },
+  imgBadge: {
+    position: 'absolute', bottom: 8, right: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 6, paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  imgCam: {
+    width: 11, height: 8, borderRadius: 1.5,
+    borderWidth: 1, borderColor: C.textHelper,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  imgCamLens: {
+    width: 4, height: 4, borderRadius: 2,
+    borderWidth: 1, borderColor: C.textHelper,
+  },
+  imgCount: {
+    fontSize: 10, color: C.textHelper, fontFamily: F.semiBold,
   },
 });
