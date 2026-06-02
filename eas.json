@@ -16,7 +16,7 @@
       "channel": "preview",
       "android": {
         "buildType": "apk",
-        "artifactPath": "android/app/build/outputs/apk/**/*.apk"
+        "applicationArchivePath": "android/app/build/outputs/apk/**/*.apk"
       }
     },
     "production": {
