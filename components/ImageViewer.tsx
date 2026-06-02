@@ -6,8 +6,14 @@ import {
 
 const { width: W, height: H } = Dimensions.get('window');
 const SWIPE_THRESHOLD = W * 0.28;
-const SLIDE_MS = 220;
-const RUBBER = 0.25;
+const SLIDE_MS        = 220;
+const RUBBER          = 0.25;
+const DOUBLE_TAP_MS   = 280;
+const DOUBLE_TAP_DIST = 50;
+const ZOOM_2X         = 2;
+
+const PHOTO_TOP    = (H - H * 0.84) / 2;
+const PHOTO_BOTTOM = PHOTO_TOP + H * 0.84;
 
 interface Props {
   images: string[];
@@ -19,48 +25,50 @@ function pinchDist(t0: any, t1: any) {
   return Math.hypot(t0.pageX - t1.pageX, t0.pageY - t1.pageY);
 }
 
+function maxPan(scale: number) {
+  return { x: (W * scale - W) / 2, y: (H * 0.84 * scale - H * 0.84) / 2 };
+}
+
 export default function ImageViewer({ images, initialIndex, onClose }: Props) {
   const isOpen = initialIndex >= 0 && initialIndex < images.length;
 
   const [visible, setVisible] = useState(false);
   const [idx, setIdx]         = useState(0);
 
-  // Open / close
   const backdropOp = useRef(new Animated.Value(0)).current;
   const contentSc  = useRef(new Animated.Value(0.88)).current;
 
-  // Slide — three absolute X positions (prev / cur / next)
   const txPrev = useRef(new Animated.Value(-W)).current;
   const txCur  = useRef(new Animated.Value(0)).current;
   const txNext = useRef(new Animated.Value(W)).current;
 
-  // Zoom (applied to current image only)
   const zoomSc = useRef(new Animated.Value(1)).current;
   const zoomTX = useRef(new Animated.Value(0)).current;
   const zoomTY = useRef(new Animated.Value(0)).current;
 
-  // Mutable refs
-  const idxRef     = useRef(0);
-  const imgsRef    = useRef(images);
-  const onCloseRef = useRef(onClose);
-  const curScale   = useRef(1);
-  const savedTX    = useRef(0);
-  const savedTY    = useRef(0);
-
-  // Gesture tracking
-  const grantX    = useRef(0);
-  const grantY    = useRef(0);
-  const pinching  = useRef(false);
-  const initPinch = useRef(0);
-  const initScale = useRef(1);
-  const sliding   = useRef(false);
-  const animating = useRef(false);
+  const idxRef      = useRef(0);
+  const imgsRef     = useRef(images);
+  const onCloseRef  = useRef(onClose);
+  const curScale    = useRef(1);
+  const savedTX     = useRef(0);
+  const savedTY     = useRef(0);
+  const grantX      = useRef(0);
+  const grantY      = useRef(0);
+  const pinching    = useRef(false);
+  const initPinch   = useRef(0);
+  const initScale   = useRef(1);
+  const sliding     = useRef(false);
+  const animating   = useRef(false);
+  const liveSlideX  = useRef(0);   // overflow slide offset while zoomed
+  const lastTapTime = useRef(0);
+  const lastTapX    = useRef(0);
+  const lastTapY    = useRef(0);
 
   useEffect(() => { idxRef.current = idx; }, [idx]);
   useEffect(() => { imgsRef.current = images; }, [images]);
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
-  // ── Zoom ─────────────────────────────────────────────────────────
+  // ── Zoom ──────────────────────────────────────────────────────────
   function resetZoom(animated = false) {
     curScale.current = 1; savedTX.current = 0; savedTY.current = 0;
     if (animated) {
@@ -75,7 +83,7 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
   }
 
   // ── Slide ─────────────────────────────────────────────────────────
-  function springBack() {
+  function springBackSlide() {
     Animated.parallel([
       Animated.spring(txPrev, { toValue: -W, useNativeDriver: true, tension: 130, friction: 15 }),
       Animated.spring(txCur,  { toValue: 0,  useNativeDriver: true, tension: 130, friction: 15 }),
@@ -83,11 +91,9 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
     ]).start(() => { animating.current = false; });
   }
 
-  // direction: -1 = go to next (slide left), +1 = go to prev (slide right)
   function commitSlide(direction: 1 | -1) {
     const newIdx = idxRef.current - direction;
-    if (newIdx < 0 || newIdx >= imgsRef.current.length) { springBack(); return; }
-
+    if (newIdx < 0 || newIdx >= imgsRef.current.length) { springBackSlide(); return; }
     const target = direction * W;
     Animated.parallel([
       Animated.timing(txPrev, { toValue: -W + target, duration: SLIDE_MS, useNativeDriver: true }),
@@ -102,35 +108,36 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
     });
   }
 
-  // ── Responder handlers ────────────────────────────────────────────
-  const handleGrant = (e: any) => {
+  // ── Touch handlers ─────────────────────────────────────────────────
+  const handleTouchStart = (e: any) => {
     if (animating.current) return;
     const t = e.nativeEvent.touches;
-    pinching.current = false; sliding.current = false;
-
     if (t.length >= 2) {
       pinching.current  = true;
+      sliding.current   = false;
       initPinch.current = pinchDist(t[0], t[1]);
       initScale.current = curScale.current;
-    } else {
-      const touch = t[0] ?? e.nativeEvent;
-      grantX.current = touch.pageX;
-      grantY.current = touch.pageY;
+    } else if (t.length === 1 && !pinching.current) {
+      grantX.current  = t[0].pageX;
+      grantY.current  = t[0].pageY;
+      sliding.current = false;
     }
   };
 
-  const handleMove = (e: any) => {
+  const handleTouchMove = (e: any) => {
     if (animating.current) return;
     const t = e.nativeEvent.touches;
 
     if (t.length >= 2) {
       if (!pinching.current) {
         pinching.current  = true;
+        sliding.current   = false;
         initPinch.current = pinchDist(t[0], t[1]);
         initScale.current = curScale.current;
       }
       const newSc = Math.max(1, Math.min(4,
-        initScale.current * pinchDist(t[0], t[1]) / initPinch.current));
+        initScale.current * pinchDist(t[0], t[1]) / initPinch.current,
+      ));
       zoomSc.setValue(newSc);
       curScale.current = newSc;
       return;
@@ -138,17 +145,45 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
 
     if (pinching.current) return;
 
-    const touch = t[0] ?? e.nativeEvent;
+    const touch = t[0];
+    if (!touch) return;
     const dx = touch.pageX - grantX.current;
     const dy = touch.pageY - grantY.current;
 
     if (curScale.current > 1) {
-      zoomTX.setValue(savedTX.current + dx);
-      zoomTY.setValue(savedTY.current + dy);
+      const { x: mx, y: my } = maxPan(curScale.current);
+      const desiredTX = savedTX.current + dx;
+      const clampedTY = Math.max(-my, Math.min(my, savedTY.current + dy));
+
+      if (Math.abs(desiredTX) > mx) {
+        // Pan hit the horizontal edge → overflow into slide
+        const clamped  = desiredTX > 0 ? mx : -mx;
+        const overflow = desiredTX - clamped;
+        zoomTX.setValue(clamped);
+        zoomTY.setValue(clampedTY);
+
+        const canGoPrev = idxRef.current > 0;
+        const canGoNext = idxRef.current < imgsRef.current.length - 1;
+        let eff = overflow;
+        if (overflow > 0 && !canGoPrev) eff = overflow * RUBBER;
+        if (overflow < 0 && !canGoNext) eff = overflow * RUBBER;
+
+        txPrev.setValue(-W + eff);
+        txCur.setValue(eff);
+        txNext.setValue(W + eff);
+        liveSlideX.current = eff;
+      } else {
+        zoomTX.setValue(desiredTX);
+        zoomTY.setValue(clampedTY);
+        if (liveSlideX.current !== 0) {
+          txPrev.setValue(-W); txCur.setValue(0); txNext.setValue(W);
+          liveSlideX.current = 0;
+        }
+      }
       return;
     }
 
-    // Start sliding only if movement is predominantly horizontal
+    // Horizontal slide between images
     if (!sliding.current) {
       if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
       sliding.current = Math.abs(dx) > Math.abs(dy);
@@ -166,41 +201,112 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
     txNext.setValue(W + eff);
   };
 
-  const handleRelease = (e: any) => {
+  const handleTouchEnd = (e: any) => {
     if (animating.current) return;
+    const remaining = e.nativeEvent.touches;
+    const changed   = e.nativeEvent.changedTouches ?? [];
 
+    // One finger lifted during pinch — keep remaining finger as pan start
+    if (pinching.current && remaining.length >= 1) {
+      pinching.current = false;
+      grantX.current   = remaining[0].pageX;
+      grantY.current   = remaining[0].pageY;
+      return;
+    }
+    if (remaining.length > 0) return;
+
+    // All fingers lifted
     if (pinching.current) {
       pinching.current = false;
       if (curScale.current < 1.05) resetZoom(true);
       return;
     }
 
-    const touch = (e.nativeEvent.changedTouches ?? [])[0] ?? e.nativeEvent;
-    const dx = touch.pageX - grantX.current;
-    const dy = touch.pageY - grantY.current;
-
-    if (curScale.current > 1) {
-      savedTX.current += dx;
-      savedTY.current += dy;
-      return;
-    }
+    const endTouch = changed[0] ?? e.nativeEvent;
+    const dx = endTouch.pageX - grantX.current;
+    const dy = endTouch.pageY - grantY.current;
 
     if (sliding.current) {
       sliding.current   = false;
       animating.current = true;
       if      (dx < -SWIPE_THRESHOLD) commitSlide(-1);
       else if (dx >  SWIPE_THRESHOLD) commitSlide(1);
-      else                            springBack();
+      else                            springBackSlide();
       return;
     }
 
-    if (Math.abs(dx) < 12 && Math.abs(dy) < 12) onCloseRef.current();
+    if (curScale.current > 1) {
+      const { x: mx, y: my } = maxPan(curScale.current);
+
+      // Overflow slide committed
+      if (Math.abs(liveSlideX.current) > SWIPE_THRESHOLD) {
+        const dir = liveSlideX.current > 0 ? 1 : -1;
+        liveSlideX.current = 0;
+        resetZoom();
+        animating.current = true;
+        commitSlide(dir);
+        return;
+      }
+      // Overflow not enough — snap slide positions back
+      if (liveSlideX.current !== 0) {
+        txPrev.setValue(-W); txCur.setValue(0); txNext.setValue(W);
+        liveSlideX.current = 0;
+      }
+      // Save accumulated pan (clamped to valid range)
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+        savedTX.current = Math.max(-mx, Math.min(mx, savedTX.current + dx));
+        savedTY.current = Math.max(-my, Math.min(my, savedTY.current + dy));
+        return;
+      }
+      // Tiny movement while zoomed — fall through for double-tap check
+    }
+
+    // Tap / double-tap
+    if (Math.abs(dx) < 12 && Math.abs(dy) < 12) {
+      const now  = Date.now();
+      const tapX = endTouch.pageX;
+      const tapY = endTouch.pageY;
+      const isDoubleTap =
+        now - lastTapTime.current < DOUBLE_TAP_MS &&
+        Math.hypot(tapX - lastTapX.current, tapY - lastTapY.current) < DOUBLE_TAP_DIST;
+
+      if (isDoubleTap) {
+        lastTapTime.current = 0;
+        if (curScale.current > 1) {
+          resetZoom(true);
+        } else {
+          const s = ZOOM_2X;
+          const { x: mx, y: my } = maxPan(s);
+          const tx = (W / 2 - tapX) * (s - 1);
+          const ty = (H / 2 - tapY) * (s - 1);
+          curScale.current = s;
+          savedTX.current  = Math.max(-mx, Math.min(mx, tx));
+          savedTY.current  = Math.max(-my, Math.min(my, ty));
+          Animated.parallel([
+            Animated.spring(zoomSc, { toValue: s,               useNativeDriver: true }),
+            Animated.spring(zoomTX, { toValue: savedTX.current, useNativeDriver: true }),
+            Animated.spring(zoomTY, { toValue: savedTY.current, useNativeDriver: true }),
+          ]).start();
+        }
+        return;
+      }
+
+      lastTapTime.current = now;
+      lastTapX.current    = tapX;
+      lastTapY.current    = tapY;
+
+      // Single tap outside photo area → close (only when not zoomed)
+      if (curScale.current <= 1 && (tapY < PHOTO_TOP || tapY > PHOTO_BOTTOM)) {
+        onCloseRef.current();
+      }
+    }
   };
 
-  const handleTerminate = () => {
-    pinching.current = false; sliding.current = false;
-    if (animating.current) return;
-    springBack();
+  const handleTouchCancel = () => {
+    pinching.current   = false;
+    sliding.current    = false;
+    liveSlideX.current = 0;
+    if (!animating.current) springBackSlide();
   };
 
   // ── Open / close ──────────────────────────────────────────────────
@@ -210,6 +316,7 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
   useEffect(() => {
     if (isOpen) {
       resetZoom();
+      lastTapTime.current = 0;
       txPrev.setValue(-W); txCur.setValue(0); txNext.setValue(W);
       idxRef.current = initialIndex;
       setIdx(initialIndex);
@@ -251,14 +358,15 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
 
   return (
     <Animated.View style={[StyleSheet.absoluteFill, s.wrap, { opacity: backdropOp }]}>
+      {/* Gesture layer — onTouch* provides reliable multi-touch data on Android */}
       <Animated.View
         style={[StyleSheet.absoluteFill, { transform: [{ scale: contentSc }] }]}
         onStartShouldSetResponder={() => true}
         onMoveShouldSetResponder={() => true}
-        onResponderGrant={handleGrant}
-        onResponderMove={handleMove}
-        onResponderRelease={handleRelease}
-        onResponderTerminate={handleTerminate}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
       >
         {prevUri && (
           <Animated.Image
@@ -267,8 +375,6 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
             resizeMode="contain"
           />
         )}
-
-        {/* Current image: slide offset + zoom pan + zoom scale */}
         <Animated.Image
           source={{ uri: curUri }}
           style={[s.img, {
@@ -281,7 +387,6 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
           }]}
           resizeMode="contain"
         />
-
         {nextUri && (
           <Animated.Image
             source={{ uri: nextUri }}
@@ -301,7 +406,6 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
           <View style={s.xL1} />
           <View style={s.xL2} />
         </TouchableOpacity>
-
         {n > 1 && (
           <View style={s.dots} pointerEvents="none">
             {Array.from({ length: n }, (_, i) => (
