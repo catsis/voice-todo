@@ -421,7 +421,10 @@ export default function VoiceModal({ visible, apiKey, onClose, onAdd }: Props) {
       transparent
       animationType="slide"
       statusBarTranslucent
-      onRequestClose={handleClose}
+      onRequestClose={() => {
+          if (viewerIndex >= 0) { setViewerIndex(-1); return; }
+          handleClose();
+        }}
     >
       <View style={s.overlay}>
         <TouchableOpacity

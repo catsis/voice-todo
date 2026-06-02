@@ -199,6 +199,7 @@ export default function TaskDetailModal({ task, visible, onClose, onSave }: Prop
   }
 
   function handleBackPress() {
+    if (viewerIndex >= 0) { setViewerIndex(-1); return; }
     if (showDatePicker) { setShowDatePicker(false); }
     else if (isEditing) { setIsEditing(false); }
     else { onClose(); }

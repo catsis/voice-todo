@@ -30,28 +30,24 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
   const imgTX      = useRef(new Animated.Value(0)).current;
   const imgTY      = useRef(new Animated.Value(0)).current;
 
-  // Mutable zoom state (no re-renders needed)
+  // Mutable zoom state (no re-renders)
   const curSc    = useRef(1);
   const saveTX   = useRef(0);
   const saveTY   = useRef(0);
   const pinching = useRef(false);
   const pin0dist = useRef(0);
   const pin0sc   = useRef(1);
+  const wasOpen  = useRef(false);
 
-  // Always-current refs for PanResponder callbacks
+  // Stable refs
   const idxRef     = useRef(0);
   const imgsRef    = useRef(images);
-  const visRef     = useRef(false);
   const onCloseRef = useRef(onClose);
-  const doGoRef    = useRef<(i: number) => void>(() => {});
-  const doCloseRef = useRef<() => void>(() => {});
-
   useEffect(() => { idxRef.current = currentIndex; }, [currentIndex]);
   useEffect(() => { imgsRef.current = images; },     [images]);
-  useEffect(() => { visRef.current = visible; },     [visible]);
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
-  // ── Zoom helpers ────────────────────────────────────────────────
+  // ── Zoom ────────────────────────────────────────────────────────
   function resetZoom(anim = false) {
     curSc.current = 1; saveTX.current = 0; saveTY.current = 0;
     if (anim) {
@@ -66,28 +62,23 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
   }
 
   // ── Image switch ────────────────────────────────────────────────
-  function doGo(idx: number) {
+  const switchToRef = useRef<(idx: number) => void>(() => {});
+  function switchTo(idx: number) {
     if (idx < 0 || idx >= imgsRef.current.length) return;
     resetZoom();
     imgOp.setValue(0);
     setCurrentIndex(idx);
     idxRef.current = idx;
-    Animated.timing(imgOp, { toValue: 1, duration: 140, useNativeDriver: true }).start();
+    // setTimeout gives React one frame to update image source before fade-in
+    setTimeout(() => {
+      Animated.timing(imgOp, { toValue: 1, duration: 160, useNativeDriver: true }).start();
+    }, 16);
   }
-  useEffect(() => { doGoRef.current = doGo; });
+  useEffect(() => { switchToRef.current = switchTo; });
 
-  // ── Open / close ────────────────────────────────────────────────
-  function doClose() {
-    Animated.parallel([
-      Animated.timing(contentSc,  { toValue: 0.88, duration: 180, useNativeDriver: true }),
-      Animated.timing(backdropOp, { toValue: 0,    duration: 180, useNativeDriver: true }),
-    ]).start(() => { setVisible(false); onCloseRef.current(); });
-  }
-  useEffect(() => { doCloseRef.current = doClose; });
-
-  // Track open state to avoid re-firing open anim on index change while open
-  const wasOpen = useRef(false);
-
+  // ── Open/close — isOpen effect is the ONLY place that drives animation ──
+  // User actions just call onClose() — never run animation themselves.
+  // This prevents the double-close loop (doClose → onClose → isOpen=false → doClose again).
   useEffect(() => {
     if (isOpen) {
       setCurrentIndex(initialIndex);
@@ -96,19 +87,21 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
       imgOp.setValue(1);
       if (!wasOpen.current) {
         wasOpen.current = true;
-        setVisible(true);
-        // open animation fires in the visible effect below
+        setVisible(true); // open anim fires in prevVisible effect below
       } else {
-        // Viewer already open — switch image
-        doGoRef.current(initialIndex);
+        switchToRef.current(initialIndex); // already open, just switch
       }
     } else if (wasOpen.current) {
       wasOpen.current = false;
-      doCloseRef.current();
+      // Close animation — we do NOT call onClose here (parent already called it)
+      Animated.parallel([
+        Animated.timing(contentSc,  { toValue: 0.88, duration: 180, useNativeDriver: true }),
+        Animated.timing(backdropOp, { toValue: 0,    duration: 180, useNativeDriver: true }),
+      ]).start(() => setVisible(false));
     }
   }, [isOpen, initialIndex]);
 
-  // Start open animation once the component is actually visible in the tree
+  // Open animation — fires once when visible transitions false→true
   const prevVisible = useRef(false);
   useEffect(() => {
     if (visible && !prevVisible.current) {
@@ -122,21 +115,26 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
     prevVisible.current = visible;
   }, [visible]);
 
-  // ── Android back button ──────────────────────────────────────────
+  // ── Android back button — calls onClose (parent drives close) ──
   useEffect(() => {
     if (!visible) return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      doCloseRef.current();
+      onCloseRef.current();
       return true;
     });
     return () => sub.remove();
   }, [visible]);
 
-  // ── PanResponder — pinch zoom + swipe navigation ────────────────
+  // ── PanResponder ─────────────────────────────────────────────────
+  // Fix: onStartShouldSetPanResponder always returns true so the gesture
+  // layer reliably claims single-finger touches. The close button
+  // (inside a separate sibling subtree via pointerEvents=box-none)
+  // is unaffected — it claims via the normal responder bubble.
   const pr = useRef(PanResponder.create({
-    onStartShouldSetPanResponder:        (e)    => e.nativeEvent.touches.length >= 2,
-    onStartShouldSetPanResponderCapture: (e)    => e.nativeEvent.touches.length >= 2,
-    onMoveShouldSetPanResponder:         (_, g) => Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6,
+    onStartShouldSetPanResponder:        () => true,
+    onStartShouldSetPanResponderCapture: () => false,
+    onMoveShouldSetPanResponder:         () => true,
+    onMoveShouldSetPanResponderCapture:  () => false,
 
     onPanResponderGrant: (e) => {
       const t = e.nativeEvent.touches;
@@ -152,15 +150,17 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
     onPanResponderMove: (e, g) => {
       const t = e.nativeEvent.touches;
       if (t.length >= 2) {
+        // Transition 1-finger → 2-finger mid-gesture
         if (!pinching.current) {
           pinching.current = true;
           pin0dist.current = dist2(t[0], t[1]);
           pin0sc.current   = curSc.current;
         }
-        const newSc = Math.max(1, Math.min(4, pin0sc.current * dist2(t[0], t[1]) / pin0dist.current));
+        const d = dist2(t[0], t[1]);
+        const newSc = Math.max(1, Math.min(4, pin0sc.current * d / pin0dist.current));
         imgSc.setValue(newSc);
         curSc.current = newSc;
-      } else if (curSc.current > 1) {
+      } else if (curSc.current > 1 && !pinching.current) {
         imgTX.setValue(saveTX.current + g.dx);
         imgTY.setValue(saveTY.current + g.dy);
       }
@@ -175,10 +175,10 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
         saveTY.current += g.dy;
       } else {
         const ax = Math.abs(g.dx), ay = Math.abs(g.dy);
-        if (ax > 60 && ax > ay * 1.5) {
-          doGoRef.current(idxRef.current + (g.dx < 0 ? 1 : -1));
-        } else if (ax < 8 && ay < 8) {
-          doCloseRef.current();
+        if (ax > 50 && ax > ay * 1.5) {
+          switchToRef.current(idxRef.current + (g.dx < 0 ? 1 : -1));
+        } else if (ax < 10 && ay < 10) {
+          onCloseRef.current(); // tap anywhere → close
         }
       }
     },
@@ -208,9 +208,13 @@ export default function ImageViewer({ images, initialIndex, onClose }: Props) {
         />
       </Animated.View>
 
-      {/* UI overlay — pointerEvents=box-none lets touches pass through to gesture layer */}
+      {/* UI overlay — box-none passes unhandled touches to gesture layer */}
       <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-        <TouchableOpacity style={s.closeBtn} onPress={() => doCloseRef.current()} activeOpacity={0.75}>
+        <TouchableOpacity
+          style={s.closeBtn}
+          onPress={() => onCloseRef.current()}
+          activeOpacity={0.75}
+        >
           <View style={s.xL1} />
           <View style={s.xL2} />
         </TouchableOpacity>
